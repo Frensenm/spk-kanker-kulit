@@ -1,287 +1,165 @@
-"""
-SPK Deteksi Dini Kanker Kulit
-Menggunakan MobileNetV2 (HAM10000) + Streamlit
-Deployed on Streamlit Community Cloud
-"""
-
-import json
-import numpy as np
-import pandas as pd
 import streamlit as st
 import tensorflow as tf
+import numpy as np
 from PIL import Image
+import json
+import pandas as pd
+from datetime import datetime
 
-# ============================================================
-# KONFIGURASI HALAMAN
-# ============================================================
+# ── Konfigurasi halaman ──
 st.set_page_config(
     page_title="SPK Deteksi Dini Kanker Kulit",
     page_icon="🔬",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    layout="wide"
 )
 
-# ============================================================
-# DESKRIPSI 7 KELAS LESI KULIT (HAM10000)
-# ============================================================
-CLASS_INFO = {
-    "akiec": {
-        "name": "Actinic Keratoses",
-        "kategori": "Pra-kanker",
-        "warna": "🟠",
-        "deskripsi": (
-            "Lesi pra-kanker akibat paparan sinar matahari berlebih. "
-            "Berpotensi berkembang menjadi karsinoma sel skuamosa."
-        ),
-    },
-    "bcc": {
-        "name": "Basal Cell Carcinoma",
-        "kategori": "Ganas (Kanker)",
-        "warna": "🔴",
-        "deskripsi": (
-            "Kanker kulit paling umum, tumbuh lambat dan jarang menyebar. "
-            "Tetap perlu penanganan medis untuk mencegah kerusakan jaringan."
-        ),
-    },
-    "bkl": {
-        "name": "Benign Keratosis",
-        "kategori": "Jinak",
-        "warna": "🟢",
-        "deskripsi": (
-            "Lesi jinak meliputi seborrheic keratoses dan solar lentigo. "
-            "Umumnya tidak berbahaya namun perlu dibedakan dari melanoma."
-        ),
-    },
-    "df": {
-        "name": "Dermatofibroma",
-        "kategori": "Jinak",
-        "warna": "🟢",
-        "deskripsi": (
-            "Benjolan kulit jinak akibat reaksi terhadap luka kecil "
-            "atau gigitan serangga. Tidak berbahaya."
-        ),
-    },
-    "mel": {
-        "name": "Melanoma",
-        "kategori": "Ganas (Kanker)",
-        "warna": "🔴",
-        "deskripsi": (
-            "Kanker kulit paling agresif, dapat menyebar cepat ke organ lain. "
-            "Deteksi dini sangat krusial untuk prognosis yang baik."
-        ),
-    },
-    "nv": {
-        "name": "Melanocytic Nevi",
-        "kategori": "Jinak",
-        "warna": "🟢",
-        "deskripsi": (
-            "Tahi lalat biasa. Mayoritas tidak berbahaya, namun perlu "
-            "dipantau jika berubah ukuran, warna, atau bentuk."
-        ),
-    },
-    "vasc": {
-        "name": "Vascular Lesions",
-        "kategori": "Jinak",
-        "warna": "🟢",
-        "deskripsi": (
-            "Lesi pembuluh darah seperti hemangioma dan angioma ceri. "
-            "Umumnya jinak dan tidak memerlukan perawatan."
-        ),
-    },
-}
-
-# ============================================================
-# LOAD MODEL & LABEL (cache supaya hanya dimuat sekali)
-# ============================================================
-@st.cache_resource(show_spinner="🔄 Memuat model MobileNetV2...")
-def load_model_and_labels():
-    """Load model H5 dan label map. Dijalankan sekali per session."""
-    model = tf.keras.models.load_model("model_final.h5")
-    with open("label_map.json", "r") as f:
+# ── Load model & label ──
+@st.cache_resource
+def load_model():
+    model = tf.keras.models.load_model('model_final.h5')
+    with open('label_map.json') as f:
         label_map = json.load(f)
-    # Pastikan format konsisten: {index: kode_kelas}
-    # Contoh: {"0": "akiec", "1": "bcc", ...}
     return model, label_map
 
+model, label_map = load_model()
 
-# ============================================================
-# PREPROCESSING GAMBAR
-# ============================================================
-def preprocess_image(image: Image.Image, target_size=(224, 224)) -> np.ndarray:
-    """
-    Konversi PIL Image -> numpy array siap input MobileNetV2.
-    - Resize ke 224x224
-    - Konversi ke RGB (jaga-jaga input PNG dengan alpha channel)
-    - Normalisasi 0-1
-    - Expand dim ke (1, 224, 224, 3)
-    """
-    image = image.convert("RGB").resize(target_size)
-    arr = np.array(image, dtype=np.float32) / 255.0
-    arr = np.expand_dims(arr, axis=0)
-    return arr
+# ── Keterangan klinis per kelas ──
+info_kelas = {
+    'nv': {'nama': 'Melanocytic Nevi', 'status': 'Jinak',
+           'rekomendasi': 'Lesi ini bersifat jinak (tahi lalat biasa). Pantau secara berkala menggunakan kriteria ABCDE. Konsultasikan ke dokter jika ada perubahan ukuran, bentuk, atau warna.'},
+    'mel': {'nama': 'Melanoma', 'status': 'Ganas',
+            'rekomendasi': 'SEGERA konsultasikan ke dokter spesialis kulit (dermatologis). Melanoma adalah kanker kulit paling berbahaya. Deteksi dini sangat menentukan keberhasilan pengobatan.'},
+    'bkl': {'nama': 'Benign Keratosis-like Lesions', 'status': 'Jinak',
+            'rekomendasi': 'Lesi ini umumnya bersifat jinak. Disarankan pemeriksaan klinis untuk memastikan diagnosis dan memantau perkembangan lesi.'},
+    'bcc': {'nama': 'Basal Cell Carcinoma', 'status': 'Ganas',
+            'rekomendasi': 'Segera periksakan ke dokter spesialis kulit. Meskipun jarang bermetastasis, BCC perlu penanganan medis segera untuk mencegah kerusakan jaringan lebih lanjut.'},
+    'akiec': {'nama': 'Actinic Keratoses', 'status': 'Prakanker',
+              'rekomendasi': 'Actinic Keratoses adalah lesi prakanker akibat paparan sinar UV. Disarankan segera berkonsultasi dengan dokter spesialis kulit untuk penanganan dini.'},
+    'vasc': {'nama': 'Vascular Lesions', 'status': 'Jinak',
+             'rekomendasi': 'Lesi vaskular umumnya bersifat jinak. Konsultasikan ke dokter untuk evaluasi lebih lanjut jika lesi membesar atau berdarah.'},
+    'df': {'nama': 'Dermatofibroma', 'status': 'Jinak',
+           'rekomendasi': 'Dermatofibroma adalah benjolan jinak pada kulit. Umumnya tidak memerlukan pengobatan kecuali mengganggu atau ada perubahan yang mencurigakan.'}
+}
 
+# ── Inisialisasi riwayat ──
+if 'riwayat' not in st.session_state:
+    st.session_state.riwayat = []
 
-# ============================================================
-# SIDEBAR — INFO APLIKASI
-# ============================================================
+# ── Sidebar ──
 with st.sidebar:
-    st.markdown("## 🔬 Tentang Aplikasi")
-    st.markdown(
-        """
-        Sistem Pendukung Keputusan untuk **deteksi dini kanker kulit**
-        menggunakan model deep learning **MobileNetV2** yang dilatih
-        pada dataset **HAM10000**.
-        
-        **7 kelas lesi kulit:**
-        - 🔴 Melanoma (mel)
-        - 🔴 Basal Cell Carcinoma (bcc)
-        - 🟠 Actinic Keratoses (akiec)
-        - 🟢 Melanocytic Nevi (nv)
-        - 🟢 Benign Keratosis (bkl)
-        - 🟢 Dermatofibroma (df)
-        - 🟢 Vascular Lesions (vasc)
-        """
-    )
-    st.markdown("---")
-    st.markdown("### ⚠️ Disclaimer")
-    st.warning(
-        "Aplikasi ini adalah **alat bantu skripsi** dan **BUKAN pengganti "
-        "diagnosis medis profesional**. Hasil prediksi harus selalu "
-        "dikonfirmasi oleh dokter spesialis kulit (dermatolog)."
-    )
-    st.markdown("---")
-    st.caption("📚 Skripsi — MobileNetV2 + Streamlit")
+    st.markdown("### SPK Deteksi Dini Kanker Kulit")
+    st.caption("MobileNetV2 + Streamlit")
+    st.divider()
+    halaman = st.radio("Menu", ["Deteksi Lesi Kulit",
+                                 "Riwayat Prediksi",
+                                 "Tentang Sistem"])
+    st.divider()
+    st.caption("v1.0 — Tugas Akhir IF 2025")
 
+# ══════════════════════════════
+# HALAMAN 1: DETEKSI
+# ══════════════════════════════
+if halaman == "Deteksi Lesi Kulit":
+    st.title("Deteksi Lesi Kulit")
+    st.caption("Unggah citra dermoskopi untuk dianalisis oleh model MobileNetV2")
+    st.divider()
 
-# ============================================================
-# MAIN PAGE
-# ============================================================
-st.title("🔬 SPK Deteksi Dini Kanker Kulit")
-st.markdown(
-    "**Unggah gambar lesi kulit** untuk mendapatkan prediksi klasifikasi "
-    "menggunakan model MobileNetV2 yang telah dilatih pada dataset HAM10000."
-)
-
-# Load model di awal agar error muncul lebih cepat kalau ada masalah
-try:
-    model, label_map = load_model_and_labels()
-except Exception as e:
-    st.error(f"❌ Gagal memuat model: {e}")
-    st.stop()
-
-# Layout 2 kolom
-col_upload, col_result = st.columns([1, 1.3])
-
-with col_upload:
-    st.subheader("📤 Unggah Gambar")
-    uploaded_file = st.file_uploader(
-        "Pilih file gambar (JPG, JPEG, PNG):",
-        type=["jpg", "jpeg", "png"],
-        help="Gunakan gambar lesi kulit yang jelas dan tidak buram.",
+    uploaded = st.file_uploader(
+        "Unggah Citra Lesi Kulit",
+        type=['jpg', 'jpeg', 'png'],
+        help="Format: JPG, JPEG, PNG — Maks. 5 MB"
     )
 
-    if uploaded_file is not None:
-        image = Image.open(uploaded_file)
-        st.image(
-            image,
-            caption=f"Gambar yang diunggah: {uploaded_file.name}",
-            use_container_width=True,
-        )
-
-with col_result:
-    st.subheader("📊 Hasil Prediksi")
-
-    if uploaded_file is None:
-        st.info("👈 Silakan unggah gambar terlebih dahulu di kolom kiri.")
-    else:
-        with st.spinner("🧠 Menganalisis gambar..."):
-            # Preprocess + Predict
-            img_array = preprocess_image(image)
-            predictions = model.predict(img_array, verbose=0)[0]
-
-        # Mapping index -> nama kelas
-        # label_map bisa berupa {"0": "akiec"} atau {"akiec": 0}
-        # Kita bikin keduanya kompatibel:
-        if all(isinstance(v, int) for v in label_map.values()):
-            # Format {"akiec": 0, "bcc": 1, ...} -> balik
-            idx_to_label = {v: k for k, v in label_map.items()}
+    if uploaded:
+        # Validasi ukuran
+        if uploaded.size > 5 * 1024 * 1024:
+            st.error("Ukuran berkas melebihi batas 5 MB. Silakan unggah citra lain.")
         else:
-            # Format {"0": "akiec", "1": "bcc", ...}
-            idx_to_label = {int(k): v for k, v in label_map.items()}
+            img = Image.open(uploaded).convert('RGB')
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                st.image(img, caption="Pratinjau Citra", use_column_width=True)
 
-        # Top-3 prediksi
-        top3_idx = predictions.argsort()[-3:][::-1]
+            with col2:
+                if st.button("Analisis Sekarang", type="primary", use_container_width=True):
+                    with st.spinner("Menganalisis citra..."):
+                        # Preprocessing
+                        img_resized = img.resize((224, 224))
+                        img_array = np.array(img_resized) / 255.0
+                        img_array = np.expand_dims(img_array, axis=0)
 
-        # ---------- Hasil Utama ----------
-        top1_idx = top3_idx[0]
-        top1_label = idx_to_label[top1_idx]
-        top1_confidence = predictions[top1_idx]
-        top1_info = CLASS_INFO.get(top1_label, {})
+                        # Prediksi
+                        pred = model.predict(img_array, verbose=0)[0]
+                        idx = int(np.argmax(pred))
+                        kode = label_map[str(idx)]
+                        info = info_kelas[kode]
+                        prob = float(pred[idx]) * 100
 
-        st.markdown(
-            f"### {top1_info.get('warna', '⚪')} "
-            f"{top1_info.get('name', top1_label.upper())}"
-        )
-        st.markdown(f"**Kategori:** {top1_info.get('kategori', '-')}")
-        st.progress(float(top1_confidence))
-        st.markdown(f"**Tingkat Keyakinan:** `{top1_confidence*100:.2f}%`")
+                        # Tampilkan hasil
+                        st.success("Analisis selesai!")
+                        st.metric("Prediksi Utama", info['nama'])
+                        st.metric("Probabilitas", f"{prob:.1f}%")
 
-        with st.expander("ℹ️ Penjelasan kelas ini"):
-            st.write(top1_info.get("deskripsi", "Tidak ada deskripsi tersedia."))
+                        status = info['status']
+                        if status == 'Ganas':
+                            st.error(f"Status: {status}")
+                        elif status == 'Prakanker':
+                            st.warning(f"Status: {status}")
+                        else:
+                            st.success(f"Status: {status}")
 
-        # ---------- Top-3 Confidence Chart ----------
-        st.markdown("---")
-        st.markdown("#### 📈 Top-3 Prediksi")
-        df_top3 = pd.DataFrame(
-            {
-                "Kelas": [
-                    CLASS_INFO.get(idx_to_label[i], {}).get(
-                        "name", idx_to_label[i]
-                    )
-                    for i in top3_idx
-                ],
-                "Confidence (%)": [predictions[i] * 100 for i in top3_idx],
-            }
-        )
-        st.dataframe(
-            df_top3.style.format({"Confidence (%)": "{:.2f}"}),
-            use_container_width=True,
-            hide_index=True,
-        )
-        st.bar_chart(df_top3.set_index("Kelas"))
+                        # Bar chart probabilitas
+                        st.markdown("**Distribusi Probabilitas 7 Kelas**")
+                        prob_df = pd.DataFrame({
+                            'Kelas': [label_map[str(i)] for i in range(7)],
+                            'Probabilitas (%)': [round(float(pred[i])*100, 2) for i in range(7)]
+                        }).sort_values('Probabilitas (%)', ascending=False)
+                        st.bar_chart(prob_df.set_index('Kelas'))
 
-        # ---------- Probabilitas Semua Kelas ----------
-        with st.expander("🔍 Lihat probabilitas semua 7 kelas"):
-            df_all = pd.DataFrame(
-                {
-                    "Kode": [idx_to_label[i] for i in range(len(predictions))],
-                    "Nama Kelas": [
-                        CLASS_INFO.get(idx_to_label[i], {}).get(
-                            "name", idx_to_label[i]
-                        )
-                        for i in range(len(predictions))
-                    ],
-                    "Probabilitas (%)": [p * 100 for p in predictions],
-                }
-            ).sort_values("Probabilitas (%)", ascending=False)
-            st.dataframe(
-                df_all.style.format({"Probabilitas (%)": "{:.2f}"}),
-                use_container_width=True,
-                hide_index=True,
-            )
+                        # Rekomendasi medis
+                        st.info(f"**Rekomendasi Medis:** {info['rekomendasi']}")
 
-        # ---------- Disclaimer ----------
-        st.markdown("---")
-        st.error(
-            "⚠️ **Penting:** Hasil ini hanya untuk tujuan **edukatif & skripsi**. "
-            "Konsultasikan dengan **dokter spesialis kulit** untuk diagnosis akurat."
-        )
+                        # Simpan ke riwayat
+                        st.session_state.riwayat.append({
+                            'Waktu': datetime.now().strftime("%d %b %Y, %H:%M"),
+                            'Prediksi': info['nama'],
+                            'Probabilitas': f"{prob:.1f}%",
+                            'Status': status
+                        })
 
-# ============================================================
-# FOOTER
-# ============================================================
-st.markdown("---")
-st.caption(
-    "🎓 Skripsi — Sistem Pendukung Keputusan Deteksi Dini Kanker Kulit | "
-    "Model: MobileNetV2 | Dataset: HAM10000 | Framework: TensorFlow + Streamlit"
-)
+        if st.button("Reset", use_container_width=True):
+            st.rerun()
+
+    st.divider()
+    st.caption("Hasil analisis ini bersifat sebagai alat bantu skrining awal (second opinion) dan bukan pengganti diagnosis klinis oleh dokter spesialis kulit.")
+
+# ══════════════════════════════
+# HALAMAN 2: RIWAYAT
+# ══════════════════════════════
+elif halaman == "Riwayat Prediksi":
+    st.title("Riwayat Prediksi")
+    st.caption("Seluruh sesi pemeriksaan yang telah dilakukan")
+    st.divider()
+
+    if st.session_state.riwayat:
+        df_riwayat = pd.DataFrame(st.session_state.riwayat)
+        st.dataframe(df_riwayat, use_container_width=True)
+        if st.button("Hapus Semua Riwayat"):
+            st.session_state.riwayat = []
+            st.rerun()
+    else:
+        st.info("Belum ada riwayat prediksi. Mulai deteksi di menu Deteksi Lesi Kulit.")
+
+# ══════════════════════════════
+# HALAMAN 3: TENTANG
+# ══════════════════════════════
+elif halaman == "Tentang Sistem":
+    st.title("Tentang Sistem")
+    st.divider()
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Nama Sistem", "SPK Deteksi Dini Kanker Kulit")
+        st.metric("Arsitektur Model", "MobileNetV2 + Transfer Learning")
+    with col2:
+        st.metric("Dataset", "HAM10000 (10.015 citra, 7 kelas)")
+        st.metric("Framework", "Python · TensorFlow · Streamlit")
