@@ -1,0 +1,52 @@
+# Virtual environments
+venv/
+venvkanker/
+venvcancer/
+env/
+ENV/
+.venv
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Jupyter / IPython
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Logs & temp files
+*.log
+*.tmp
+.cache/
+
+# Model artifacts (kecuali model_final.h5 yang DIBUTUHKAN)
+checkpoints/
+runs/
+wandb/
+
+# Test images / data privat
+test_images/
+private_data/
