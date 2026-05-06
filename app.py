@@ -688,55 +688,97 @@ elif st.session_state.page == "Riwayat Prediksi":
             st.session_state.page = "Deteksi Lesi Kulit"
             st.rerun()
     else:
-        # Render tabel dengan HTML agar bisa tampil thumbnail + badge
-        rows_html = ""
-        for i, r in enumerate(reversed(st.session_state.riwayat), 1):
-            img_html = f'<img src="data:image/jpeg;base64,{r["image_b64"]}" style="width:44px;height:44px;object-fit:cover;border-radius:6px;">'
-            rows_html += f"""
-            <tr>
-                <td style="padding:10px 14px;color:#94a3b8;font-size:0.83rem">{i}</td>
-                <td style="padding:10px 14px;color:#94a3b8;font-size:0.83rem;white-space:nowrap">{r['waktu']}</td>
-                <td style="padding:10px 14px">{img_html}</td>
-                <td style="padding:10px 14px;color:#f1f5f9;font-size:0.85rem">{r['prediksi']}</td>
-                <td style="padding:10px 14px;font-family:'IBM Plex Mono',monospace;color:#f1f5f9;font-size:0.85rem">{r['prob']}</td>
-                <td style="padding:10px 14px"><span class="badge {r['badge_class']}">{r['status']}</span></td>
-            </tr>
-            """
-
-        st.markdown(f"""
-        <div style="overflow-x:auto;border:1px solid #2d3148;border-radius:10px;overflow:hidden">
-            <table style="width:100%;border-collapse:collapse;background:#21242f">
-                <thead>
-                    <tr style="border-bottom:1px solid #2d3148;background:#1a1d27">
-                        <th style="padding:10px 14px;text-align:left;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;color:#64748b;text-transform:uppercase">No</th>
-                        <th style="padding:10px 14px;text-align:left;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;color:#64748b;text-transform:uppercase">Waktu</th>
-                        <th style="padding:10px 14px;text-align:left;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;color:#64748b;text-transform:uppercase">Citra</th>
-                        <th style="padding:10px 14px;text-align:left;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;color:#64748b;text-transform:uppercase">Prediksi</th>
-                        <th style="padding:10px 14px;text-align:left;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;color:#64748b;text-transform:uppercase">Probabilitas</th>
-                        <th style="padding:10px 14px;text-align:left;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;color:#64748b;text-transform:uppercase">Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows_html}
-                </tbody>
-            </table>
+        # ── Header row ──
+        st.markdown("""
+        <div style="display:grid;grid-template-columns:40px 150px 60px 1fr 110px 100px;
+                    gap:0;border:1px solid #2d3148;border-radius:10px 10px 0 0;
+                    background:#1a1d27;padding:10px 14px;margin-bottom:0">
+            <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase">No</span>
+            <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase">Waktu</span>
+            <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase">Citra</span>
+            <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase">Prediksi</span>
+            <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase">Probabilitas</span>
+            <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase">Status</span>
         </div>
         """, unsafe_allow_html=True)
 
+        # ── Data rows menggunakan Streamlit columns ──
+        riwayat_reversed = list(reversed(st.session_state.riwayat))
+        for i, r in enumerate(riwayat_reversed, 1):
+            # Border styling: last row rounded bottom
+            is_last = (i == len(riwayat_reversed))
+            border_radius = "0 0 10px 10px" if is_last else "0"
+            bg = "#21242f" if i % 2 == 0 else "#1e2130"
+
+            c_no, c_waktu, c_img, c_pred, c_prob, c_status = st.columns(
+                [0.4, 1.5, 0.6, 2.2, 1.1, 1.0]
+            )
+
+            # Decode base64 thumbnail → PIL Image
+            try:
+                img_bytes = base64.b64decode(r["image_b64"])
+                thumb = Image.open(io.BytesIO(img_bytes))
+            except Exception:
+                thumb = None
+
+            row_style = (
+                f"background:{bg};padding:8px 4px;"
+                f"border-left:1px solid #2d3148;"
+                f"border-right:1px solid #2d3148;"
+                f"border-bottom:1px solid #2d3148;"
+                f"border-radius:{border_radius};"
+            )
+
+            with c_no:
+                st.markdown(
+                    f'<div style="{row_style}padding-left:14px;'
+                    f'color:#64748b;font-size:0.83rem;line-height:44px">{i}</div>',
+                    unsafe_allow_html=True,
+                )
+            with c_waktu:
+                st.markdown(
+                    f'<div style="{row_style}color:#94a3b8;font-size:0.8rem;'
+                    f'line-height:1.4;padding-top:10px">{r["waktu"]}</div>',
+                    unsafe_allow_html=True,
+                )
+            with c_img:
+                st.markdown(f'<div style="{row_style}">', unsafe_allow_html=True)
+                if thumb:
+                    st.image(thumb, width=44)
+                st.markdown("</div>", unsafe_allow_html=True)
+            with c_pred:
+                st.markdown(
+                    f'<div style="{row_style}color:#f1f5f9;font-size:0.84rem;'
+                    f'line-height:1.4;padding-top:10px">{r["prediksi"]}</div>',
+                    unsafe_allow_html=True,
+                )
+            with c_prob:
+                st.markdown(
+                    f'<div style="{row_style}font-family:\'IBM Plex Mono\',monospace;'
+                    f'color:#f1f5f9;font-size:0.84rem;line-height:44px;text-align:center">'
+                    f'{r["prob"]}</div>',
+                    unsafe_allow_html=True,
+                )
+            with c_status:
+                st.markdown(
+                    f'<div style="{row_style}padding-top:11px;text-align:center">'
+                    f'<span class="badge {r["badge_class"]}">{r["status"]}</span></div>',
+                    unsafe_allow_html=True,
+                )
+
         st.markdown("<br>", unsafe_allow_html=True)
 
-        col_act1, col_act2 = st.columns([1, 3])
+        col_act1, col_act2, col_act3 = st.columns([1, 1, 2])
         with col_act1:
             if st.button("Hapus Riwayat", type="secondary", use_container_width=True, key="btn_hapus"):
                 st.session_state.riwayat = []
                 st.rerun()
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("Deteksi Baru", type="primary", use_container_width=True, key="btn_deteksi_baru"):
-            st.session_state.hasil = None
-            st.session_state.uploaded_image = None
-            st.session_state.page = "Deteksi Lesi Kulit"
-            st.rerun()
+        with col_act2:
+            if st.button("Deteksi Baru", type="primary", use_container_width=True, key="btn_deteksi_baru"):
+                st.session_state.hasil = None
+                st.session_state.uploaded_image = None
+                st.session_state.page = "Deteksi Lesi Kulit"
+                st.rerun()
 
 # ============================================================
 # HALAMAN 4 — TENTANG SISTEM
