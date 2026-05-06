@@ -1,6 +1,7 @@
 """
 SPK Deteksi Dini Kanker Kulit
 MobileNetV2 + HAM10000 + Streamlit
+Final version — 3 halaman: Deteksi, Riwayat, Tentang
 """
 
 import json
@@ -14,9 +15,7 @@ import streamlit as st
 import tensorflow as tf
 from PIL import Image
 
-# ============================================================
-# KONFIGURASI HALAMAN
-# ============================================================
+# ── Page config ──────────────────────────────────────────────
 st.set_page_config(
     page_title="SPK Deteksi Dini Kanker Kulit",
     page_icon="🔬",
@@ -24,803 +23,908 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ============================================================
-# CUSTOM CSS — Dark Theme sesuai referensi
-# ============================================================
+# ═════════════════════════════════════════════════════════════
+# CSS
+# ═════════════════════════════════════════════════════════════
 st.markdown("""
 <style>
-/* ── Import font ── */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap');
 
-/* ── Root variables ── */
 :root {
-    --bg-primary:    #0f1117;
-    --bg-secondary:  #1a1d27;
-    --bg-card:       #21242f;
-    --bg-hover:      #2a2d3a;
-    --accent-blue:   #3b82f6;
-    --accent-red:    #ef4444;
-    --accent-orange: #f97316;
-    --accent-green:  #22c55e;
-    --text-primary:  #f1f5f9;
-    --text-secondary:#94a3b8;
-    --text-muted:    #64748b;
-    --border:        #2d3148;
-    --radius:        10px;
+  --bg:         #0a0c12;
+  --bg2:        #111420;
+  --bg3:        #181c2a;
+  --bg4:        #1f243a;
+  --border:     #252a40;
+  --border2:    #2e3550;
+  --accent:     #4f7cff;
+  --accent-dim: #1e2d5a;
+  --red:        #ff4d6d;
+  --red-dim:    #3d0f1a;
+  --orange:     #ff8c42;
+  --orange-dim: #3d2010;
+  --green:      #3ecf8e;
+  --green-dim:  #0d3326;
+  --t1:         #eef0f8;
+  --t2:         #8892b0;
+  --t3:         #4a5270;
+  --radius:     12px;
+  --radius-sm:  8px;
 }
 
-/* ── Global reset ── */
+*, *::before, *::after { box-sizing: border-box; }
+
 html, body, [class*="css"] {
-    font-family: 'IBM Plex Sans', sans-serif !important;
-    background-color: var(--bg-primary) !important;
-    color: var(--text-primary) !important;
+  font-family: 'DM Sans', sans-serif !important;
+  background-color: var(--bg) !important;
+  color: var(--t1) !important;
 }
 
-/* ── Hide default streamlit chrome ── */
 #MainMenu, footer, header { visibility: hidden; }
-.block-container { padding: 2rem 2.5rem !important; max-width: 1100px; }
+.block-container {
+  padding: 2rem 2.5rem 4rem !important;
+  max-width: 1080px;
+}
 
-/* ── Sidebar ── */
+/* ── Sidebar ──────────────────────────────────────── */
 section[data-testid="stSidebar"] {
-    background-color: var(--bg-secondary) !important;
-    border-right: 1px solid var(--border) !important;
+  background: var(--bg2) !important;
+  border-right: 1px solid var(--border) !important;
 }
-section[data-testid="stSidebar"] > div { padding: 1.5rem 1.2rem !important; }
-
-/* ── App branding in sidebar ── */
-.app-brand { margin-bottom: 1.5rem; }
-.app-brand h2 {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1.3;
-    margin: 0 0 2px 0;
-}
-.app-brand p {
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    margin: 0;
-    font-family: 'IBM Plex Mono', monospace;
+section[data-testid="stSidebar"] > div {
+  padding: 2rem 1.4rem !important;
 }
 
-/* ── Sidebar menu label ── */
-.menu-label {
-    font-size: 0.68rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    margin: 0 0 0.5rem 0;
+.brand-block { margin-bottom: 2.5rem; }
+.brand-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+.brand-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--t1);
+  line-height: 1.3;
+  margin: 0 0 3px;
+}
+.brand-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--t3);
+  margin: 0;
 }
 
-/* ── Sidebar nav buttons ── */
+.nav-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+  margin: 0 0 0.6rem;
+}
+
 div[data-testid="stSidebar"] .stButton button {
-    width: 100% !important;
-    text-align: left !important;
-    background: transparent !important;
-    border: none !important;
-    border-radius: var(--radius) !important;
-    color: var(--text-secondary) !important;
-    font-size: 0.875rem !important;
-    font-weight: 400 !important;
-    padding: 0.55rem 0.9rem !important;
-    margin-bottom: 2px !important;
-    transition: all 0.15s ease !important;
+  width: 100% !important;
+  text-align: left !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--t2) !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 0.875rem !important;
+  font-weight: 400 !important;
+  padding: 0.6rem 0.9rem !important;
+  margin-bottom: 3px !important;
+  transition: all 0.15s ease !important;
+  letter-spacing: 0 !important;
 }
 div[data-testid="stSidebar"] .stButton button:hover {
-    background-color: var(--bg-hover) !important;
-    color: var(--text-primary) !important;
+  background: var(--bg3) !important;
+  border-color: var(--border) !important;
+  color: var(--t1) !important;
+}
+.nav-active div[data-testid="stSidebar"] .stButton button,
+.nav-active .stButton button {
+  background: var(--accent-dim) !important;
+  border-color: var(--accent) !important;
+  color: #a8c0ff !important;
+  font-weight: 500 !important;
 }
 
-/* ── Active nav button (via key hack) ── */
-.nav-active button {
-    background-color: var(--accent-blue) !important;
-    color: #fff !important;
-    font-weight: 600 !important;
+.disc-box {
+  background: #1a1208;
+  border: 1px solid #3d2e0a;
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
+  margin-top: 0.4rem;
+}
+.disc-box p {
+  font-size: 0.78rem;
+  color: #c8a83a;
+  margin: 0;
+  line-height: 1.65;
+}
+.disc-box strong { color: #f0c040; }
+
+/* ── Page heading ─────────────────────────────────── */
+.page-heading {
+  font-family: 'Syne', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--t1);
+  letter-spacing: -0.03em;
+  margin: 0 0 4px;
+  line-height: 1.15;
+}
+.page-sub {
+  font-size: 0.88rem;
+  color: var(--t3);
+  margin: 0 0 2rem;
 }
 
-/* ── Disclaimer box in sidebar ── */
-.disclaimer-box {
-    background-color: #2a1f0e;
-    border: 1px solid #78350f;
-    border-radius: var(--radius);
-    padding: 0.9rem;
-    margin-top: 0.5rem;
-}
-.disclaimer-box p {
-    font-size: 0.8rem;
-    color: #fbbf24;
-    margin: 0;
-    line-height: 1.6;
-}
-.disclaimer-box strong { color: #f59e0b; }
-
-/* ── Page titles ── */
-.page-title {
-    font-size: 1.7rem;
-    font-weight: 700;
-    color: var(--text-primary);
-    margin: 0 0 2px 0;
-    line-height: 1.2;
-}
-.page-subtitle {
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    margin: 0 0 1.8rem 0;
-}
-
-/* ── Section labels ── */
-.section-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin-bottom: 0.6rem;
-}
-
-/* ── Upload area ── */
+/* ── Upload zone ──────────────────────────────────── */
 div[data-testid="stFileUploader"] {
-    background: var(--bg-card) !important;
-    border: 1.5px dashed var(--border) !important;
-    border-radius: var(--radius) !important;
-    padding: 2rem !important;
+  background: var(--bg3) !important;
+  border: 1.5px dashed var(--border2) !important;
+  border-radius: var(--radius) !important;
+  transition: border-color 0.2s !important;
 }
-div[data-testid="stFileUploader"] label {
-    color: var(--text-secondary) !important;
-    font-size: 0.875rem !important;
+div[data-testid="stFileUploader"]:hover {
+  border-color: var(--accent) !important;
+}
+div[data-testid="stFileUploader"] label { display: none !important; }
+
+.upload-hint {
+  text-align: center;
+  padding: 0.4rem 0 0.8rem;
+  font-size: 0.78rem;
+  color: var(--t3);
+}
+.upload-hint span {
+  display: inline-block;
+  background: var(--bg4);
+  border: 1px solid var(--border2);
+  border-radius: 99px;
+  padding: 2px 10px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  margin: 0 2px;
 }
 
-/* ── Main action button ── */
-.stButton button[kind="primary"], button[data-testid*="primary"] {
-    background-color: var(--accent-blue) !important;
-    border: none !important;
-    border-radius: var(--radius) !important;
-    color: #fff !important;
-    font-weight: 600 !important;
-    font-size: 0.9rem !important;
-    padding: 0.65rem 1.2rem !important;
-    width: 100% !important;
-    transition: all 0.2s ease !important;
+/* ── Buttons ──────────────────────────────────────── */
+.stButton button {
+  border-radius: var(--radius-sm) !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-weight: 500 !important;
+  font-size: 0.875rem !important;
+  transition: all 0.18s ease !important;
+  letter-spacing: 0.01em !important;
+}
+.stButton button[kind="primary"] {
+  background: var(--accent) !important;
+  border: none !important;
+  color: #fff !important;
+  padding: 0.65rem 1.4rem !important;
 }
 .stButton button[kind="primary"]:hover {
-    background-color: #2563eb !important;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 15px rgba(59,130,246,0.4) !important;
+  background: #3a68f5 !important;
+  box-shadow: 0 4px 20px rgba(79,124,255,0.4) !important;
+  transform: translateY(-1px) !important;
 }
-
-/* ── Secondary button ── */
 .stButton button[kind="secondary"] {
-    background-color: var(--bg-card) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius) !important;
-    color: var(--text-secondary) !important;
-    font-weight: 500 !important;
-    font-size: 0.9rem !important;
-    padding: 0.65rem 1.2rem !important;
-    width: 100% !important;
+  background: var(--bg3) !important;
+  border: 1px solid var(--border2) !important;
+  color: var(--t2) !important;
+  padding: 0.65rem 1.4rem !important;
+}
+.stButton button[kind="secondary"]:hover {
+  background: var(--bg4) !important;
+  border-color: var(--t3) !important;
+  color: var(--t1) !important;
 }
 
-/* ── Disclaimer text ── */
-.upload-disclaimer {
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    padding: 0.75rem 0.9rem;
-    background: var(--bg-card);
-    border-radius: var(--radius);
-    border: 1px solid var(--border);
-    line-height: 1.6;
-    margin-top: 0.5rem;
+/* ── Section label ────────────────────────────────── */
+.slabel {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--t3);
+  margin: 0 0 0.7rem;
 }
 
-/* ── Result card ── */
-.result-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.2rem;
-    margin-bottom: 0.75rem;
+/* ── Result panel ─────────────────────────────────── */
+.result-wrap {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.4rem;
+  margin-bottom: 0.8rem;
 }
-.result-card-label {
-    font-size: 0.7rem;
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin-bottom: 0.5rem;
-}
-.result-class-name {
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--accent-red);
-    margin: 0 0 4px 0;
-}
-.result-class-name.jinak { color: var(--accent-green); }
-.result-class-name.prakanker { color: var(--accent-orange); }
+.result-wrap.danger  { border-color: var(--red);    background: linear-gradient(135deg, var(--red-dim) 0%, var(--bg2) 60%); }
+.result-wrap.warning { border-color: var(--orange); background: linear-gradient(135deg, var(--orange-dim) 0%, var(--bg2) 60%); }
+.result-wrap.safe    { border-color: var(--green);  background: linear-gradient(135deg, var(--green-dim) 0%, var(--bg2) 60%); }
+
+.result-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--t3); margin-bottom: 6px; }
+.result-name  { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 700; margin: 0 0 8px; line-height: 1.2; }
+.result-name.danger  { color: var(--red); }
+.result-name.warning { color: var(--orange); }
+.result-name.safe    { color: var(--green); }
 
 .badge {
-    display: inline-block;
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 2px 10px;
-    border-radius: 999px;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.72rem; font-weight: 600;
+  padding: 3px 10px; border-radius: 99px;
+  border: 1px solid transparent;
 }
-.badge-ganas  { background: #450a0a; color: #fca5a5; }
-.badge-prakanker { background: #431407; color: #fdba74; }
-.badge-jinak  { background: #052e16; color: #86efac; }
+.badge.danger  { background: var(--red-dim);    color: #ff8fa3; border-color: #5a1425; }
+.badge.warning { background: var(--orange-dim); color: #ffb380; border-color: #5a3010; }
+.badge.safe    { background: var(--green-dim);  color: #6ee7b7; border-color: #0d4a32; }
 
-.confidence-value {
-    font-size: 1.4rem;
-    font-weight: 700;
-    font-family: 'IBM Plex Mono', monospace;
-    color: var(--text-primary);
+.conf-value {
+  font-family: 'DM Mono', monospace;
+  font-size: 2rem; font-weight: 500;
+  color: var(--t1); line-height: 1;
 }
 
-/* ── Probability bar list ── */
-.prob-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-    font-size: 0.82rem;
+/* ── Probability bars ─────────────────────────────── */
+.pbar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.pbar-name { font-size: 0.8rem; color: var(--t2); width: 185px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pbar-track { flex: 1; height: 6px; background: var(--bg4); border-radius: 99px; overflow: hidden; }
+.pbar-fill { height: 100%; border-radius: 99px; }
+.pbar-fill.danger  { background: var(--red); }
+.pbar-fill.warning { background: var(--orange); }
+.pbar-fill.safe    { background: var(--green); }
+.pbar-fill.accent  { background: var(--accent); }
+.pbar-pct { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--t3); width: 42px; text-align: right; flex-shrink: 0; }
+
+/* ── Reco box ─────────────────────────────────────── */
+.reco-box {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem 1rem;
+  margin-top: 0.8rem;
 }
-.prob-label { width: 200px; color: var(--text-secondary); flex-shrink: 0; }
-.prob-bar-bg {
-    flex: 1;
-    height: 8px;
-    background: var(--bg-hover);
-    border-radius: 999px;
-    overflow: hidden;
+.reco-box p { font-size: 0.82rem; color: var(--t2); margin: 0; line-height: 1.75; }
+
+/* ── Preview image card ───────────────────────────── */
+.img-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 0.8rem;
 }
-.prob-bar-fill {
-    height: 100%;
-    border-radius: 999px;
-    background: var(--accent-blue);
-    transition: width 0.6s ease;
-}
-.prob-bar-fill.top { background: var(--accent-red); }
-.prob-bar-fill.orange { background: var(--accent-orange); }
-.prob-bar-fill.green { background: var(--accent-green); }
-.prob-pct {
-    width: 46px;
-    text-align: right;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    flex-shrink: 0;
+.img-card-footer {
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  color: var(--t3);
+  font-family: 'DM Mono', monospace;
+  border-top: 1px solid var(--border);
+  background: var(--bg3);
 }
 
-/* ── Rekomendasi medis ── */
-.rekomendasi-box {
-    background: #0f1e3d;
-    border: 1px solid #1e3a8a;
-    border-radius: var(--radius);
-    padding: 1rem;
-    margin-top: 0.5rem;
-}
-.rekomendasi-box p { font-size: 0.83rem; color: #93c5fd; margin: 0; line-height: 1.7; }
-
-/* ── Action buttons row ── */
-.btn-row { display: flex; gap: 10px; margin-top: 1rem; }
-
-/* ── History table ── */
-.stDataFrame { border-radius: var(--radius) !important; }
-div[data-testid="stDataFrame"] {
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius) !important;
-    overflow: hidden;
-}
-
-/* ── Progress bar override ── */
-.stProgress > div > div { background-color: var(--accent-blue) !important; }
-
-/* ── Divider ── */
+/* ── Divider ──────────────────────────────────────── */
 hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
 
-/* ── Streamlit image caption ── */
-div[data-testid="caption"] { color: var(--text-muted) !important; font-size: 0.78rem !important; }
+/* ── Riwayat table ────────────────────────────────── */
+.rtable-head {
+  display: grid;
+  grid-template-columns: 36px 130px 52px 1fr 100px 90px;
+  gap: 0;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 10px 14px;
+}
+.rtable-hcell {
+  font-size: 0.65rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--t3);
+}
 
-/* ── Remove default radio button styling for nav ── */
-div[data-testid="stRadio"] > label { display: none; }
+/* ── Tentang cards ────────────────────────────────── */
+.info-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.2rem;
+  margin-bottom: 0.7rem;
+  transition: border-color 0.2s;
+}
+.info-card:hover { border-color: var(--border2); }
+.info-card-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--t3); margin-bottom: 4px; }
+.info-card-value { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 600; color: var(--t1); }
+
+.kelas-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.9rem;
+  margin-bottom: 6px;
+  transition: border-color 0.15s;
+}
+.kelas-row:hover { border-color: var(--border2); }
+.kelas-name { font-size: 0.85rem; font-weight: 500; color: var(--t1); }
+.kelas-code { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--t3); margin-left: 6px; }
+
+/* ── Disclaimer strip ─────────────────────────────── */
+.disc-strip {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 1rem;
+  font-size: 0.78rem;
+  color: var(--t3);
+  line-height: 1.6;
+  margin-top: 0.8rem;
+}
+
+/* ── Progress bar override ────────────────────────── */
+.stProgress > div > div { background: var(--accent) !important; border-radius: 99px !important; }
+
+/* ── Streamlit image ──────────────────────────────── */
+div[data-testid="caption"] { font-size: 0.72rem !important; color: var(--t3) !important; }
+
+/* ── Spinner ──────────────────────────────────────── */
+div[data-testid="stSpinner"] p { color: var(--t2) !important; font-size: 0.85rem !important; }
+
+/* ── stat chip ────────────────────────────────────── */
+.stat-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg3); border: 1px solid var(--border2);
+  border-radius: 99px; padding: 4px 12px;
+  font-size: 0.75rem; color: var(--t2);
+  font-family: 'DM Mono', monospace;
+}
+.stat-chip b { color: var(--t1); font-weight: 500; }
 </style>
 """, unsafe_allow_html=True)
 
-# ============================================================
-# DESKRIPSI 7 KELAS LESI KULIT
-# ============================================================
+# ═════════════════════════════════════════════════════════════
+# CLASS DATA
+# ═════════════════════════════════════════════════════════════
 CLASS_INFO = {
     "akiec": {
         "name": "Actinic Keratoses",
-        "short": "akiec",
         "kategori": "Pra-kanker",
-        "badge_class": "badge-prakanker",
-        "name_class": "prakanker",
+        "variant": "warning",
         "warna": "🟠",
-        "rekomendasi": "Lesi pra-kanker akibat paparan sinar UV berlebih. Segera periksakan ke dokter spesialis kulit untuk penanganan dini sebelum berkembang menjadi karsinoma sel skuamosa.",
+        "rekomendasi": (
+            "Lesi pra-kanker akibat paparan sinar UV berlebih. "
+            "Segera periksakan ke dokter spesialis kulit untuk penanganan dini "
+            "sebelum berkembang menjadi karsinoma sel skuamosa."
+        ),
     },
     "bcc": {
         "name": "Basal Cell Carcinoma",
-        "short": "bcc",
         "kategori": "Ganas (Kanker)",
-        "badge_class": "badge-ganas",
-        "name_class": "ganas",
+        "variant": "danger",
         "warna": "🔴",
-        "rekomendasi": "Kanker kulit yang perlu penanganan medis segera. Meskipun jarang bermetastasis, BCC dapat merusak jaringan sekitar jika dibiarkan. Segera konsultasikan ke dermatologis.",
+        "rekomendasi": (
+            "Kanker kulit yang memerlukan penanganan medis segera. "
+            "Meskipun jarang bermetastasis, BCC dapat merusak jaringan sekitar. "
+            "Segera konsultasikan ke dermatologis."
+        ),
     },
     "bkl": {
         "name": "Benign Keratosis",
-        "short": "bkl",
         "kategori": "Jinak",
-        "badge_class": "badge-jinak",
-        "name_class": "jinak",
+        "variant": "safe",
         "warna": "🟢",
-        "rekomendasi": "Lesi jinak meliputi seborrheic keratoses dan solar lentigo. Umumnya tidak berbahaya. Tetap disarankan pemeriksaan klinis untuk konfirmasi diagnosis.",
+        "rekomendasi": (
+            "Lesi jinak meliputi seborrheic keratoses dan solar lentigo. "
+            "Umumnya tidak berbahaya. Tetap disarankan pemeriksaan klinis "
+            "untuk konfirmasi diagnosis."
+        ),
     },
     "df": {
         "name": "Dermatofibroma",
-        "short": "df",
         "kategori": "Jinak",
-        "badge_class": "badge-jinak",
-        "name_class": "jinak",
+        "variant": "safe",
         "warna": "🟢",
-        "rekomendasi": "Benjolan jinak pada kulit. Umumnya tidak memerlukan pengobatan kecuali mengganggu aktivitas atau terdapat perubahan yang mencurigakan.",
+        "rekomendasi": (
+            "Benjolan jinak pada kulit. Umumnya tidak memerlukan pengobatan "
+            "kecuali mengganggu aktivitas atau terdapat perubahan yang mencurigakan."
+        ),
     },
     "mel": {
         "name": "Melanoma",
-        "short": "mel",
         "kategori": "Ganas (Kanker)",
-        "badge_class": "badge-ganas",
-        "name_class": "ganas",
+        "variant": "danger",
         "warna": "🔴",
-        "rekomendasi": "Melanoma adalah kanker kulit paling berbahaya yang berasal dari sel melanosit. Deteksi dini sangat menentukan keberhasilan pengobatan. Hasil ini bukan diagnosis final — segera periksakan ke dermatologis untuk tindak lanjut klinis.",
+        "rekomendasi": (
+            "Melanoma adalah kanker kulit paling berbahaya yang berasal dari sel melanosit. "
+            "Deteksi dini sangat menentukan keberhasilan pengobatan. "
+            "Segera periksakan ke dermatologis untuk tindak lanjut klinis."
+        ),
     },
     "nv": {
         "name": "Melanocytic Nevi",
-        "short": "nv",
         "kategori": "Jinak",
-        "badge_class": "badge-jinak",
-        "name_class": "jinak",
+        "variant": "safe",
         "warna": "🟢",
-        "rekomendasi": "Tahi lalat biasa yang bersifat jinak. Pantau secara berkala menggunakan kriteria ABCDE (Asymmetry, Border, Color, Diameter, Evolution). Konsultasikan jika ada perubahan.",
+        "rekomendasi": (
+            "Tahi lalat biasa yang bersifat jinak. Pantau secara berkala "
+            "menggunakan kriteria ABCDE. Konsultasikan jika ada perubahan "
+            "ukuran, warna, atau bentuk."
+        ),
     },
     "vasc": {
         "name": "Vascular Lesions",
-        "short": "vasc",
         "kategori": "Jinak",
-        "badge_class": "badge-jinak",
-        "name_class": "jinak",
+        "variant": "safe",
         "warna": "🟢",
-        "rekomendasi": "Lesi pembuluh darah seperti hemangioma dan angioma. Umumnya jinak dan tidak memerlukan perawatan, namun konsultasikan ke dokter jika membesar atau berdarah.",
+        "rekomendasi": (
+            "Lesi pembuluh darah seperti hemangioma dan angioma. "
+            "Umumnya jinak. Konsultasikan ke dokter jika membesar atau berdarah."
+        ),
     },
 }
 
-# ============================================================
-# SESSION STATE INIT
-# ============================================================
-if "page" not in st.session_state:
-    st.session_state.page = "Deteksi Lesi Kulit"
-if "riwayat" not in st.session_state:
-    st.session_state.riwayat = []
-if "hasil" not in st.session_state:
-    st.session_state.hasil = None
-if "uploaded_image" not in st.session_state:
-    st.session_state.uploaded_image = None
+# ═════════════════════════════════════════════════════════════
+# SESSION STATE
+# ═════════════════════════════════════════════════════════════
+for key, val in {
+    "page": "Deteksi Lesi Kulit",
+    "riwayat": [],
+    "hasil": None,
+    "img_pil": None,
+    "img_name": "",
+}.items():
+    if key not in st.session_state:
+        st.session_state[key] = val
 
-# ============================================================
-# LOAD MODEL
-# ============================================================
+# ═════════════════════════════════════════════════════════════
+# MODEL LOAD
+# ═════════════════════════════════════════════════════════════
 @st.cache_resource(show_spinner=False)
-def load_model_and_labels():
-    model = tf.keras.models.load_model("model_final.h5")
-    with open("label_map.json", "r") as f:
-        label_map = json.load(f)
-    return model, label_map
+def load_assets():
+    m = tf.keras.models.load_model("model_final.h5")
+    with open("label_map.json") as f:
+        lm = json.load(f)
+    return m, lm
 
-def preprocess_image(image: Image.Image, target_size=(224, 224)) -> np.ndarray:
-    image = image.convert("RGB").resize(target_size)
-    arr = np.array(image, dtype=np.float32) / 255.0
+def preprocess(img: Image.Image) -> np.ndarray:
+    img = img.convert("RGB").resize((224, 224))
+    arr = np.array(img, dtype=np.float32) / 255.0
     return np.expand_dims(arr, axis=0)
 
-def image_to_base64(img: Image.Image, size=(60, 60)) -> str:
-    img_thumb = img.copy().convert("RGB")
-    img_thumb.thumbnail(size)
+def img_to_b64(img: Image.Image, size=(56, 56)) -> str:
+    t = img.copy().convert("RGB")
+    t.thumbnail(size)
     buf = io.BytesIO()
-    img_thumb.save(buf, format="JPEG", quality=70)
+    t.save(buf, format="JPEG", quality=75)
+    return base64.b64decode(base64.b64encode(buf.getvalue())).decode()
+
+def img_b64_str(img: Image.Image, size=(56, 56)) -> str:
+    t = img.copy().convert("RGB")
+    t.thumbnail(size)
+    buf = io.BytesIO()
+    t.save(buf, format="JPEG", quality=75)
     return base64.b64encode(buf.getvalue()).decode()
 
 try:
-    model, label_map = load_model_and_labels()
+    model, label_map = load_assets()
     if all(isinstance(v, int) for v in label_map.values()):
-        idx_to_label = {v: k for k, v in label_map.items()}
+        idx2label = {v: k for k, v in label_map.items()}
     else:
-        idx_to_label = {int(k): v for k, v in label_map.items()}
-    model_loaded = True
-except Exception as e:
-    model_loaded = False
-    model_error = str(e)
+        idx2label = {int(k): v for k, v in label_map.items()}
+    model_ok = True
+except Exception as _e:
+    model_ok = False
+    _model_err = str(_e)
 
-# ============================================================
+# ═════════════════════════════════════════════════════════════
 # SIDEBAR
-# ============================================================
+# ═════════════════════════════════════════════════════════════
 with st.sidebar:
     st.markdown("""
-    <div class="app-brand">
-        <h2>SPK Deteksi Dini Kanker Kulit</h2>
-        <p>MobileNetV2 + Streamlit</p>
+    <div class="brand-block">
+      <span class="brand-icon">🔬</span>
+      <p class="brand-title">SPK Deteksi Dini<br>Kanker Kulit</p>
+      <p class="brand-sub">MobileNetV2 · HAM10000 · Streamlit</p>
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown('<p class="menu-label">MENU</p>', unsafe_allow_html=True)
+    st.markdown('<p class="nav-label">Menu</p>', unsafe_allow_html=True)
 
-    pages = ["Deteksi Lesi Kulit", "Hasil Prediksi", "Riwayat Prediksi", "Tentang Sistem"]
-    icons  = ["🔍", "📊", "📋", "ℹ️"]
-
-    for pg, ic in zip(pages, icons):
-        is_active = st.session_state.page == pg
-        container = st.container()
-        if is_active:
-            container.markdown('<div class="nav-active">', unsafe_allow_html=True)
-        if container.button(f"{ic}  {pg}", key=f"nav_{pg}", use_container_width=True):
-            st.session_state.page = pg
+    nav_items = [
+        ("Deteksi Lesi Kulit", "🔍"),
+        ("Riwayat Prediksi",   "📋"),
+        ("Tentang Sistem",     "ℹ️"),
+    ]
+    for page, icon in nav_items:
+        active = st.session_state.page == page
+        wrap = st.container()
+        if active:
+            wrap.markdown('<div class="nav-active">', unsafe_allow_html=True)
+        if wrap.button(f"{icon}  {page}", key=f"nav_{page}", use_container_width=True):
+            st.session_state.page = page
             st.rerun()
-        if is_active:
-            container.markdown('</div>', unsafe_allow_html=True)
+        if active:
+            wrap.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown('<p class="menu-label">⚠️ Disclaimer</p>', unsafe_allow_html=True)
+    st.markdown('<p class="nav-label">⚠ Disclaimer</p>', unsafe_allow_html=True)
     st.markdown("""
-    <div class="disclaimer-box">
-        <p>Aplikasi ini adalah <strong>alat bantu skripsi</strong> dan <strong>BUKAN pengganti
-        diagnosis medis profesional</strong>. Hasil prediksi harus selalu
-        dikonfirmasi oleh dokter spesialis kulit (dermatolog).</p>
+    <div class="disc-box">
+      <p>Aplikasi ini adalah <strong>alat bantu skripsi</strong> dan
+      <strong>bukan pengganti diagnosis medis profesional</strong>.
+      Hasil prediksi wajib dikonfirmasi oleh dokter spesialis kulit.</p>
     </div>
     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown('<p style="font-size:0.72rem;color:#475569;text-align:center">📚 Skripsi — MobileNetV2 + Streamlit</p>', unsafe_allow_html=True)
-
-# ============================================================
-# HALAMAN 1 — DETEKSI LESI KULIT
-# ============================================================
-if st.session_state.page == "Deteksi Lesi Kulit":
-
-    st.markdown('<h1 class="page-title">Deteksi Lesi Kulit</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="page-subtitle">Unggah citra dermoskopi untuk dianalisis oleh model MobileNetV2</p>', unsafe_allow_html=True)
-
-    if not model_loaded:
-        st.error(f"❌ Gagal memuat model: {model_error}")
-        st.stop()
-
-    st.markdown('<p class="section-label">UNGGAH CITRA</p>', unsafe_allow_html=True)
-
-    uploaded_file = st.file_uploader(
-        "Drag and drop citra di sini",
-        type=["jpg", "jpeg", "png"],
-        label_visibility="collapsed",
-        help="Format: JPG, JPEG, PNG — Maks. 5 MB",
+    st.markdown(
+        '<p style="font-size:.68rem;color:#2e3550;text-align:center">'
+        'v1.0 — Tugas Akhir IF 2025</p>',
+        unsafe_allow_html=True,
     )
 
-    if uploaded_file is not None:
-        if uploaded_file.size > 5 * 1024 * 1024:
-            st.error("❌ Ukuran file melebihi 5 MB. Silakan unggah file yang lebih kecil.")
-            uploaded_file = None
-        else:
-            image = Image.open(uploaded_file)
-            st.session_state.uploaded_image = image
-            st.image(image, caption=f"📎 {uploaded_file.name}", use_container_width=True)
+# ═════════════════════════════════════════════════════════════
+# ── HALAMAN 1: DETEKSI LESI KULIT ────────────────────────────
+# ═════════════════════════════════════════════════════════════
+if st.session_state.page == "Deteksi Lesi Kulit":
 
-    col_a, col_b = st.columns(2)
+    st.markdown('<h1 class="page-heading">Deteksi Lesi Kulit</h1>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="page-sub">Unggah citra dermoskopi untuk dianalisis oleh model MobileNetV2 — '
+        'hasil tampil langsung di halaman ini.</p>',
+        unsafe_allow_html=True,
+    )
 
-    with col_a:
-        analisis_btn = st.button("Analisis Sekarang", type="primary", use_container_width=True, key="btn_analisis")
+    if not model_ok:
+        st.error(f"❌ Gagal memuat model: {_model_err}")
+        st.stop()
 
-    with col_b:
-        reset_btn = st.button("Reset", type="secondary", use_container_width=True, key="btn_reset")
+    # ── Two-column layout ──
+    col_left, col_right = st.columns([1, 1.25], gap="large")
 
-    if reset_btn:
-        st.session_state.uploaded_image = None
-        st.session_state.hasil = None
-        st.rerun()
+    # ── LEFT: upload + image preview ──
+    with col_left:
+        st.markdown('<p class="slabel">Unggah Citra</p>', unsafe_allow_html=True)
 
-    if analisis_btn:
-        if st.session_state.uploaded_image is None:
-            st.warning("⚠️ Silakan unggah gambar terlebih dahulu.")
-        else:
-            with st.spinner("🧠 Menganalisis citra..."):
-                img_array = preprocess_image(st.session_state.uploaded_image)
-                predictions = model.predict(img_array, verbose=0)[0]
+        uploaded = st.file_uploader(
+            "upload",
+            type=["jpg", "jpeg", "png"],
+            label_visibility="collapsed",
+        )
 
-            top_idx = int(np.argmax(predictions))
-            top_label = idx_to_label[top_idx]
-            top_confidence = float(predictions[top_idx])
-            top_info = CLASS_INFO.get(top_label, {})
+        st.markdown(
+            '<div class="upload-hint">Format: <span>JPG</span> <span>JPEG</span>'
+            ' <span>PNG</span> · Maks. <span>5 MB</span></div>',
+            unsafe_allow_html=True,
+        )
 
-            # Susun semua probabilitas
-            all_probs = [
-                {
-                    "label": idx_to_label[i],
-                    "name": CLASS_INFO.get(idx_to_label[i], {}).get("name", idx_to_label[i]),
-                    "prob": float(predictions[i]),
-                    "kategori": CLASS_INFO.get(idx_to_label[i], {}).get("kategori", ""),
+        # Handle file
+        if uploaded is not None:
+            if uploaded.size > 5 * 1024 * 1024:
+                st.error("❌ File melebihi 5 MB.")
+            else:
+                st.session_state.img_pil  = Image.open(uploaded)
+                st.session_state.img_name = uploaded.name
+
+        # Show preview
+        if st.session_state.img_pil is not None:
+            st.markdown('<div class="img-card">', unsafe_allow_html=True)
+            st.image(st.session_state.img_pil, use_container_width=True)
+            st.markdown(
+                f'<div class="img-card-footer">📎 {st.session_state.img_name}</div>',
+                unsafe_allow_html=True,
+            )
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        # ── Buttons ──
+        c1, c2 = st.columns(2, gap="small")
+        with c1:
+            run_btn = st.button(
+                "Analisis Sekarang", type="primary",
+                use_container_width=True, key="btn_run",
+            )
+        with c2:
+            reset_btn = st.button(
+                "Reset", type="secondary",
+                use_container_width=True, key="btn_reset",
+            )
+
+        if reset_btn:
+            st.session_state.img_pil  = None
+            st.session_state.img_name = ""
+            st.session_state.hasil    = None
+            st.rerun()
+
+        if run_btn:
+            if st.session_state.img_pil is None:
+                st.warning("⚠️ Unggah citra terlebih dahulu.")
+            else:
+                with st.spinner("Menganalisis citra…"):
+                    arr  = preprocess(st.session_state.img_pil)
+                    preds = model.predict(arr, verbose=0)[0]
+
+                top_i   = int(np.argmax(preds))
+                top_lbl = idx2label[top_i]
+                top_conf = float(preds[top_i])
+                info    = CLASS_INFO.get(top_lbl, {})
+
+                all_probs = sorted(
+                    [{"label": idx2label[i],
+                      "name": CLASS_INFO.get(idx2label[i], {}).get("name", idx2label[i]),
+                      "prob": float(preds[i]),
+                      "variant": CLASS_INFO.get(idx2label[i], {}).get("variant", "safe")}
+                     for i in range(len(preds))],
+                    key=lambda x: x["prob"], reverse=True,
+                )
+
+                st.session_state.hasil = {
+                    "label":    top_lbl,
+                    "name":     info.get("name", top_lbl),
+                    "kategori": info.get("kategori", "-"),
+                    "variant":  info.get("variant", "safe"),
+                    "conf":     top_conf,
+                    "reko":     info.get("rekomendasi", ""),
+                    "probs":    all_probs,
+                    "waktu":    datetime.now().strftime("%d %b %Y, %H:%M"),
+                    "img_b64":  img_b64_str(st.session_state.img_pil),
+                    "img_name": st.session_state.img_name,
                 }
-                for i in range(len(predictions))
-            ]
-            all_probs.sort(key=lambda x: x["prob"], reverse=True)
 
-            st.session_state.hasil = {
-                "label": top_label,
-                "name": top_info.get("name", top_label),
-                "kategori": top_info.get("kategori", "-"),
-                "badge_class": top_info.get("badge_class", "badge-jinak"),
-                "name_class": top_info.get("name_class", "jinak"),
-                "confidence": top_confidence,
-                "rekomendasi": top_info.get("rekomendasi", ""),
-                "all_probs": all_probs,
-                "image": st.session_state.uploaded_image,
-                "waktu": datetime.now().strftime("%d %b %Y, %H:%M"),
-            }
+                # Simpan ke riwayat
+                st.session_state.riwayat.append({
+                    "waktu":    st.session_state.hasil["waktu"],
+                    "img_b64":  st.session_state.hasil["img_b64"],
+                    "prediksi": f"{info.get('name', top_lbl)} ({top_lbl})",
+                    "prob":     f"{top_conf*100:.1f}%",
+                    "status":   info.get("kategori", "-"),
+                    "variant":  info.get("variant", "safe"),
+                })
 
-            # Simpan ke riwayat
-            st.session_state.riwayat.append({
-                "waktu": datetime.now().strftime("%d %b %Y, %H:%M"),
-                "image_b64": image_to_base64(st.session_state.uploaded_image),
-                "prediksi": f"{top_info.get('name', top_label)} ({top_label})",
-                "prob": f"{top_confidence*100:.1f}%",
-                "status": top_info.get("kategori", "-"),
-                "badge_class": top_info.get("badge_class", "badge-jinak"),
-            })
+                st.rerun()
 
-            st.session_state.page = "Hasil Prediksi"
-            st.rerun()
+        st.markdown(
+            '<div class="disc-strip">Hasil analisis ini bersifat sebagai alat bantu skrining awal '
+            '(second opinion) dan bukan pengganti diagnosis klinis oleh dokter spesialis kulit.</div>',
+            unsafe_allow_html=True,
+        )
 
-    st.markdown("""
-    <div class="upload-disclaimer">
-        Hasil analisis sistem ini bersifat sebagai alat bantu skrining awal (second opinion) dan
-        bukan merupakan pengganti diagnosis klinis oleh dokter spesialis kulit.
-    </div>
-    """, unsafe_allow_html=True)
+    # ── RIGHT: hasil prediksi ──
+    with col_right:
+        if st.session_state.hasil is None:
+            # Empty state
+            st.markdown("""
+            <div style="height:100%;min-height:380px;display:flex;flex-direction:column;
+                        align-items:center;justify-content:center;text-align:center;
+                        background:var(--bg2);border:1px dashed var(--border);
+                        border-radius:var(--radius);padding:2.5rem">
+              <div style="font-size:2.5rem;margin-bottom:1rem;opacity:.4">🩺</div>
+              <p style="font-size:.9rem;color:var(--t3);max-width:220px;line-height:1.6;margin:0">
+                Unggah citra dan klik <strong style="color:var(--t2)">Analisis Sekarang</strong>
+                untuk melihat hasil prediksi di sini
+              </p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            h = st.session_state.hasil
+            v = h["variant"]
 
-# ============================================================
-# HALAMAN 2 — HASIL PREDIKSI
-# ============================================================
-elif st.session_state.page == "Hasil Prediksi":
-
-    st.markdown('<h1 class="page-title">Hasil Prediksi</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="page-subtitle">Analisis selesai — berikut hasil klasifikasi model</p>', unsafe_allow_html=True)
-
-    if st.session_state.hasil is None:
-        st.info("💡 Belum ada hasil prediksi. Silakan unggah dan analisis citra terlebih dahulu.")
-        if st.button("← Kembali ke Deteksi", type="primary"):
-            st.session_state.page = "Deteksi Lesi Kulit"
-            st.rerun()
-    else:
-        h = st.session_state.hasil
-
-        col_left, col_right = st.columns([1, 1.2], gap="large")
-
-        # ── Kolom kiri ──
-        with col_left:
-            st.markdown('<p class="section-label">CITRA YANG DIANALISIS</p>', unsafe_allow_html=True)
-            if h["image"] is not None:
-                st.image(h["image"], use_container_width=True)
-
-            # Prediksi utama
-            name_class = h.get("name_class", "jinak")
-            badge_class = h.get("badge_class", "badge-jinak")
-
+            # ── Prediksi utama ──
+            st.markdown('<p class="slabel">Hasil Prediksi</p>', unsafe_allow_html=True)
             st.markdown(f"""
-            <div class="result-card" style="margin-top:1rem">
-                <div class="result-card-label">Prediksi Utama</div>
-                <div class="result-class-name {name_class}">{h['name']} ({h['label']})</div>
-                <span class="badge {badge_class}">{h['kategori']}</span>
+            <div class="result-wrap {v}">
+              <div class="result-label">Prediksi Utama</div>
+              <div class="result-name {v}">{h['name']}</div>
+              <span class="badge {v}">
+                {'⚠' if v=='warning' else ('✕' if v=='danger' else '✓')} {h['kategori']}
+              </span>
             </div>
             """, unsafe_allow_html=True)
 
+            # ── Confidence ──
             st.markdown(f"""
-            <div class="result-card">
-                <div class="result-card-label">Probabilitas Prediksi</div>
-                <div class="confidence-value">{h['confidence']*100:.1f}%</div>
+            <div class="result-wrap" style="padding:1rem 1.4rem">
+              <div class="result-label">Tingkat Keyakinan</div>
+              <div class="conf-value">{h['conf']*100:.1f}%</div>
             </div>
             """, unsafe_allow_html=True)
 
-            # Rekomendasi medis
-            st.markdown('<p class="section-label" style="margin-top:1rem">REKOMENDASI MEDIS</p>', unsafe_allow_html=True)
+            # ── Probability bars ──
+            st.markdown('<p class="slabel" style="margin-top:.5rem">Distribusi Probabilitas</p>', unsafe_allow_html=True)
+            max_p = h["probs"][0]["prob"] if h["probs"] else 1
+            bars_html = ""
+            for item in h["probs"]:
+                width = (item["prob"] / max_p * 100) if max_p > 0 else 0
+                bars_html += f"""
+                <div class="pbar-row">
+                  <div class="pbar-name">{item['name']} <span style="color:var(--t3);font-size:.7rem">({item['label']})</span></div>
+                  <div class="pbar-track">
+                    <div class="pbar-fill {item['variant']}" style="width:{width:.1f}%"></div>
+                  </div>
+                  <div class="pbar-pct">{item['prob']*100:.1f}%</div>
+                </div>"""
+            st.markdown(bars_html, unsafe_allow_html=True)
+
+            # ── Rekomendasi ──
             st.markdown(f"""
-            <div class="rekomendasi-box">
-                <p>{h['rekomendasi']}</p>
+            <div class="reco-box">
+              <div class="result-label" style="margin-bottom:5px">Rekomendasi Medis</div>
+              <p>{h['reko']}</p>
             </div>
             """, unsafe_allow_html=True)
 
-            # Tombol aksi
-            col_btn1, col_btn2 = st.columns(2)
-            with col_btn1:
-                if st.button("Periksa Citra Lain", type="secondary", use_container_width=True, key="btn_periksa_lain"):
-                    st.session_state.hasil = None
-                    st.session_state.uploaded_image = None
-                    st.session_state.page = "Deteksi Lesi Kulit"
-                    st.rerun()
-            with col_btn2:
-                if st.button("Lihat Riwayat", type="secondary", use_container_width=True, key="btn_lihat_riwayat"):
-                    st.session_state.page = "Riwayat Prediksi"
-                    st.rerun()
-
-        # ── Kolom kanan ──
-        with col_right:
-            st.markdown('<p class="section-label">DISTRIBUSI PROBABILITAS 7 KELAS</p>', unsafe_allow_html=True)
-
-            max_prob = h["all_probs"][0]["prob"]
-
-            for i, item in enumerate(h["all_probs"]):
-                pct = item["prob"] * 100
-                width_pct = (item["prob"] / max_prob) * 100 if max_prob > 0 else 0
-
-                # Warna bar berdasarkan kategori
-                if i == 0:
-                    bar_class = "top"
-                elif "Ganas" in item["kategori"]:
-                    bar_class = "top"
-                elif "Pra" in item["kategori"]:
-                    bar_class = "orange"
-                else:
-                    bar_class = "green"
-
-                st.markdown(f"""
-                <div class="prob-row">
-                    <div class="prob-label">{item['name']} ({item['label']})</div>
-                    <div class="prob-bar-bg">
-                        <div class="prob-bar-fill {bar_class}" style="width:{width_pct:.1f}%"></div>
-                    </div>
-                    <div class="prob-pct">{pct:.1f}%</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-# ============================================================
-# HALAMAN 3 — RIWAYAT PREDIKSI
-# ============================================================
+# ═════════════════════════════════════════════════════════════
+# ── HALAMAN 2: RIWAYAT PREDIKSI ──────────────────────────────
+# ═════════════════════════════════════════════════════════════
 elif st.session_state.page == "Riwayat Prediksi":
 
-    st.markdown('<h1 class="page-title">Riwayat Prediksi</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="page-subtitle">Seluruh sesi pemeriksaan yang telah dilakukan</p>', unsafe_allow_html=True)
+    st.markdown('<h1 class="page-heading">Riwayat Prediksi</h1>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="page-sub">Seluruh sesi pemeriksaan yang telah dilakukan.</p>',
+        unsafe_allow_html=True,
+    )
 
     if not st.session_state.riwayat:
-        st.info("💡 Belum ada riwayat prediksi. Mulai deteksi di menu Deteksi Lesi Kulit.")
-        if st.button("← Mulai Deteksi", type="primary", key="btn_mulai_deteksi"):
+        st.markdown("""
+        <div style="text-align:center;padding:3rem 1rem;background:var(--bg2);
+                    border:1px dashed var(--border);border-radius:var(--radius)">
+          <div style="font-size:2rem;opacity:.35;margin-bottom:1rem">📋</div>
+          <p style="color:var(--t3);font-size:.88rem;margin:0">
+            Belum ada riwayat. Mulai deteksi di menu Deteksi Lesi Kulit.
+          </p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("← Mulai Deteksi", type="primary", key="go_deteksi"):
             st.session_state.page = "Deteksi Lesi Kulit"
             st.rerun()
     else:
-        # ── Header row ──
-        st.markdown("""
-        <div style="display:grid;grid-template-columns:40px 150px 60px 1fr 110px 100px;
-                    gap:0;border:1px solid #2d3148;border-radius:10px 10px 0 0;
-                    background:#1a1d27;padding:10px 14px;margin-bottom:0">
-            <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase">No</span>
-            <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase">Waktu</span>
-            <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase">Citra</span>
-            <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase">Prediksi</span>
-            <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase">Probabilitas</span>
-            <span style="font-size:0.72rem;font-weight:700;letter-spacing:0.08em;color:#64748b;text-transform:uppercase">Status</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # ── Data rows menggunakan Streamlit columns ──
-        riwayat_reversed = list(reversed(st.session_state.riwayat))
-        for i, r in enumerate(riwayat_reversed, 1):
-            # Border styling: last row rounded bottom
-            is_last = (i == len(riwayat_reversed))
-            border_radius = "0 0 10px 10px" if is_last else "0"
-            bg = "#21242f" if i % 2 == 0 else "#1e2130"
-
-            c_no, c_waktu, c_img, c_pred, c_prob, c_status = st.columns(
-                [0.4, 1.5, 0.6, 2.2, 1.1, 1.0]
-            )
-
-            # Decode base64 thumbnail → PIL Image
-            try:
-                img_bytes = base64.b64decode(r["image_b64"])
-                thumb = Image.open(io.BytesIO(img_bytes))
-            except Exception:
-                thumb = None
-
-            row_style = (
-                f"background:{bg};padding:8px 4px;"
-                f"border-left:1px solid #2d3148;"
-                f"border-right:1px solid #2d3148;"
-                f"border-bottom:1px solid #2d3148;"
-                f"border-radius:{border_radius};"
-            )
-
-            with c_no:
-                st.markdown(
-                    f'<div style="{row_style}padding-left:14px;'
-                    f'color:#64748b;font-size:0.83rem;line-height:44px">{i}</div>',
-                    unsafe_allow_html=True,
-                )
-            with c_waktu:
-                st.markdown(
-                    f'<div style="{row_style}color:#94a3b8;font-size:0.8rem;'
-                    f'line-height:1.4;padding-top:10px">{r["waktu"]}</div>',
-                    unsafe_allow_html=True,
-                )
-            with c_img:
-                st.markdown(f'<div style="{row_style}">', unsafe_allow_html=True)
-                if thumb:
-                    st.image(thumb, width=44)
-                st.markdown("</div>", unsafe_allow_html=True)
-            with c_pred:
-                st.markdown(
-                    f'<div style="{row_style}color:#f1f5f9;font-size:0.84rem;'
-                    f'line-height:1.4;padding-top:10px">{r["prediksi"]}</div>',
-                    unsafe_allow_html=True,
-                )
-            with c_prob:
-                st.markdown(
-                    f'<div style="{row_style}font-family:\'IBM Plex Mono\',monospace;'
-                    f'color:#f1f5f9;font-size:0.84rem;line-height:44px;text-align:center">'
-                    f'{r["prob"]}</div>',
-                    unsafe_allow_html=True,
-                )
-            with c_status:
-                st.markdown(
-                    f'<div style="{row_style}padding-top:11px;text-align:center">'
-                    f'<span class="badge {r["badge_class"]}">{r["status"]}</span></div>',
-                    unsafe_allow_html=True,
-                )
-
+        n = len(st.session_state.riwayat)
+        st.markdown(
+            f'<p class="stat-chip"><b>{n}</b> pemeriksaan tercatat</p>',
+            unsafe_allow_html=True,
+        )
         st.markdown("<br>", unsafe_allow_html=True)
 
-        col_act1, col_act2, col_act3 = st.columns([1, 1, 2])
-        with col_act1:
-            if st.button("Hapus Riwayat", type="secondary", use_container_width=True, key="btn_hapus"):
-                st.session_state.riwayat = []
-                st.rerun()
-        with col_act2:
-            if st.button("Deteksi Baru", type="primary", use_container_width=True, key="btn_deteksi_baru"):
-                st.session_state.hasil = None
-                st.session_state.uploaded_image = None
-                st.session_state.page = "Deteksi Lesi Kulit"
-                st.rerun()
-
-# ============================================================
-# HALAMAN 4 — TENTANG SISTEM
-# ============================================================
-elif st.session_state.page == "Tentang Sistem":
-
-    st.markdown('<h1 class="page-title">Tentang Sistem</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="page-subtitle">Informasi teknis dan deskripsi kelas lesi kulit</p>', unsafe_allow_html=True)
-
-    col1, col2 = st.columns(2, gap="large")
-
-    with col1:
+        # ── Header ──
         st.markdown("""
-        <div class="result-card">
-            <div class="result-card-label">Nama Sistem</div>
-            <div style="font-size:1rem;font-weight:600;color:#f1f5f9">SPK Deteksi Dini Kanker Kulit</div>
-        </div>
-        <div class="result-card">
-            <div class="result-card-label">Arsitektur Model</div>
-            <div style="font-size:1rem;font-weight:600;color:#f1f5f9">MobileNetV2 + Transfer Learning</div>
-        </div>
-        <div class="result-card">
-            <div class="result-card-label">Dataset</div>
-            <div style="font-size:1rem;font-weight:600;color:#f1f5f9">HAM10000 (10.015 citra, 7 kelas)</div>
-        </div>
-        <div class="result-card">
-            <div class="result-card-label">Framework</div>
-            <div style="font-size:1rem;font-weight:600;color:#f1f5f9">Python · TensorFlow · Streamlit</div>
+        <div class="rtable-head">
+          <span class="rtable-hcell">No</span>
+          <span class="rtable-hcell">Waktu</span>
+          <span class="rtable-hcell">Citra</span>
+          <span class="rtable-hcell">Prediksi</span>
+          <span class="rtable-hcell">Prob.</span>
+          <span class="rtable-hcell">Status</span>
         </div>
         """, unsafe_allow_html=True)
 
-    with col2:
-        st.markdown('<p class="section-label">7 KELAS LESI KULIT</p>', unsafe_allow_html=True)
-        for code, info in CLASS_INFO.items():
+        # ── Rows — native Streamlit columns ──
+        rev = list(reversed(st.session_state.riwayat))
+        for i, r in enumerate(rev, 1):
+            is_last = i == len(rev)
+            br = f"0 0 {12}px {12}px" if is_last else "0"
+            bg = "#111420" if i % 2 == 0 else "#0f1220"
+            s = (f"background:{bg};border-left:1px solid #252a40;"
+                 f"border-right:1px solid #252a40;border-bottom:1px solid #252a40;"
+                 f"border-radius:{br};padding:9px 5px;")
+
+            cno, cwk, cim, cpd, cpr, cst = st.columns([0.36, 1.3, 0.52, 2.0, 0.95, 0.9])
+
+            with cno:
+                st.markdown(
+                    f'<div style="{s}padding-left:14px;color:#4a5270;'
+                    f'font-size:.82rem;line-height:46px">{i}</div>',
+                    unsafe_allow_html=True)
+            with cwk:
+                st.markdown(
+                    f'<div style="{s}color:#8892b0;font-size:.78rem;'
+                    f'padding-top:9px;line-height:1.45">{r["waktu"]}</div>',
+                    unsafe_allow_html=True)
+            with cim:
+                st.markdown(f'<div style="{s}">', unsafe_allow_html=True)
+                try:
+                    img_bytes = base64.b64decode(r["img_b64"])
+                    thumb = Image.open(io.BytesIO(img_bytes))
+                    st.image(thumb, width=44)
+                except Exception:
+                    st.markdown("—")
+                st.markdown("</div>", unsafe_allow_html=True)
+            with cpd:
+                st.markdown(
+                    f'<div style="{s}color:#eef0f8;font-size:.82rem;'
+                    f'padding-top:9px;line-height:1.45">{r["prediksi"]}</div>',
+                    unsafe_allow_html=True)
+            with cpr:
+                st.markdown(
+                    f'<div style="{s}font-family:\'DM Mono\',monospace;'
+                    f'color:#eef0f8;font-size:.82rem;line-height:46px;text-align:center">'
+                    f'{r["prob"]}</div>',
+                    unsafe_allow_html=True)
+            with cst:
+                v = r.get("variant", "safe")
+                st.markdown(
+                    f'<div style="{s}padding-top:10px;text-align:center">'
+                    f'<span class="badge {v}">{r["status"]}</span></div>',
+                    unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        ca, cb, _ = st.columns([1, 1, 2])
+        with ca:
+            if st.button("Hapus Semua", type="secondary", use_container_width=True, key="hapus"):
+                st.session_state.riwayat = []
+                st.rerun()
+        with cb:
+            if st.button("Deteksi Baru", type="primary", use_container_width=True, key="baru"):
+                st.session_state.hasil   = None
+                st.session_state.img_pil = None
+                st.session_state.page    = "Deteksi Lesi Kulit"
+                st.rerun()
+
+# ═════════════════════════════════════════════════════════════
+# ── HALAMAN 3: TENTANG SISTEM ─────────────────────────────────
+# ═════════════════════════════════════════════════════════════
+elif st.session_state.page == "Tentang Sistem":
+
+    st.markdown('<h1 class="page-heading">Tentang Sistem</h1>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="page-sub">Informasi teknis, arsitektur model, dan kelas lesi kulit yang didukung.</p>',
+        unsafe_allow_html=True,
+    )
+
+    col_info, col_kelas = st.columns([1, 1.1], gap="large")
+
+    with col_info:
+        st.markdown('<p class="slabel">Informasi Teknis</p>', unsafe_allow_html=True)
+        specs = [
+            ("Nama Sistem",        "SPK Deteksi Dini Kanker Kulit"),
+            ("Arsitektur Model",   "MobileNetV2 + Transfer Learning"),
+            ("Dataset",            "HAM10000 — 10.015 citra"),
+            ("Jumlah Kelas",       "7 kelas lesi kulit"),
+            ("Framework",          "TensorFlow + Streamlit"),
+            ("Input Citra",        "224 × 224 piksel (RGB)"),
+            ("Platform Deploy",    "Streamlit Community Cloud"),
+        ]
+        for label, val in specs:
             st.markdown(f"""
-            <div class="result-card" style="margin-bottom:6px">
-                <div style="display:flex;align-items:center;justify-content:space-between">
-                    <div>
-                        <span style="font-size:0.85rem;font-weight:600;color:#f1f5f9">{info['warna']} {info['name']}</span>
-                        <span style="font-size:0.75rem;color:#64748b;font-family:'IBM Plex Mono',monospace;margin-left:8px">({code})</span>
-                    </div>
-                    <span class="badge {info['badge_class']}">{info['kategori']}</span>
-                </div>
+            <div class="info-card">
+              <div class="info-card-label">{label}</div>
+              <div class="info-card-value">{val}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with col_kelas:
+        st.markdown('<p class="slabel">7 Kelas Lesi Kulit</p>', unsafe_allow_html=True)
+        for code, info in CLASS_INFO.items():
+            v = info["variant"]
+            st.markdown(f"""
+            <div class="kelas-row">
+              <div>
+                <span class="kelas-name">{info['warna']} {info['name']}</span>
+                <span class="kelas-code">({code})</span>
+              </div>
+              <span class="badge {v}">{info['kategori']}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown('<p class="slabel">Cara Penggunaan</p>', unsafe_allow_html=True)
+        steps = [
+            "Buka halaman Deteksi Lesi Kulit",
+            "Unggah citra dermoskopi (JPG/PNG, maks. 5 MB)",
+            "Klik tombol Analisis Sekarang",
+            "Baca hasil prediksi dan distribusi probabilitas",
+            "Konsultasikan hasil ke dokter spesialis kulit",
+        ]
+        for i, s in enumerate(steps, 1):
+            st.markdown(f"""
+            <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">
+              <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;
+                          background:var(--accent-dim);border:1px solid var(--accent);
+                          font-size:.72rem;font-weight:700;color:#a8c0ff;
+                          display:flex;align-items:center;justify-content:center">{i}</div>
+              <p style="font-size:.83rem;color:var(--t2);margin:2px 0 0;line-height:1.5">{s}</p>
             </div>
             """, unsafe_allow_html=True)
