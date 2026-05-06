@@ -383,6 +383,54 @@ div[data-testid="stSpinner"] p { color: var(--t2) !important; font-size: 0.85rem
   font-family: 'DM Mono', monospace;
 }
 .stat-chip b { color: var(--t1); font-weight: 500; }
+
+/* ── Mobile bottom navigation bar ────────────────── */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 9999;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+}
+.mobile-nav-inner {
+  display: flex;
+  align-items: stretch;
+  height: 62px;
+}
+.mobile-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--t3);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  transition: color 0.15s, background 0.15s;
+  padding: 0 4px;
+  text-decoration: none;
+  border: none;
+}
+.mobile-nav-btn:hover { color: var(--t1); background: var(--bg3); }
+.mobile-nav-btn.active { color: var(--accent) !important; }
+.mobile-nav-btn .nav-icon { font-size: 1.3rem; line-height: 1; }
+.mobile-nav-btn .nav-text { font-size: 0.58rem; letter-spacing: 0.02em; }
+
+@media (max-width: 768px) {
+  .mobile-nav { display: block; }
+  .block-container { padding-bottom: 80px !important; }
+  .page-heading { font-size: 1.5rem !important; }
+  .page-sub { font-size: 0.82rem !important; margin-bottom: 1.2rem !important; }
+  .pbar-name { width: 130px !important; font-size: 0.72rem !important; }
+  .info-card { padding: 0.8rem 0.9rem !important; }
+  .result-wrap { padding: 1rem !important; }
+  .conf-value { font-size: 1.6rem !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -480,6 +528,18 @@ for key, val in {
     if key not in st.session_state:
         st.session_state[key] = val
 
+# ── Handle mobile nav via query params ───────────────────────
+_NAV_PARAM_MAP = {
+    "deteksi":  "Deteksi Lesi Kulit",
+    "riwayat":  "Riwayat Prediksi",
+    "tentang":  "Tentang Sistem",
+}
+_qp = st.query_params.get("nav", "")
+if _qp in _NAV_PARAM_MAP:
+    st.session_state.page = _NAV_PARAM_MAP[_qp]
+    st.query_params.clear()
+    st.rerun()
+
 # ═════════════════════════════════════════════════════════════
 # MODEL LOAD
 # ═════════════════════════════════════════════════════════════
@@ -508,6 +568,28 @@ def img_b64_str(img: Image.Image, size=(56, 56)) -> str:
     buf = io.BytesIO()
     t.save(buf, format="JPEG", quality=75)
     return base64.b64encode(buf.getvalue()).decode()
+
+def render_mobile_nav():
+    """Fixed bottom navigation bar — visible only on mobile via CSS media query."""
+    cur = st.session_state.page
+    pages = [
+        ("deteksi", "🔍", "Deteksi",  "Deteksi Lesi Kulit"),
+        ("riwayat", "📋", "Riwayat",  "Riwayat Prediksi"),
+        ("tentang", "ℹ️", "Tentang",  "Tentang Sistem"),
+    ]
+    btns = ""
+    for param, icon, label, page in pages:
+        active = "active" if cur == page else ""
+        btns += (
+            f'<a class="mobile-nav-btn {active}" href="?nav={param}">'
+            f'<span class="nav-icon">{icon}</span>'
+            f'<span class="nav-text">{label}</span>'
+            f'</a>'
+        )
+    st.markdown(
+        f'<div class="mobile-nav"><div class="mobile-nav-inner">{btns}</div></div>',
+        unsafe_allow_html=True,
+    )
 
 try:
     model, label_map = load_assets()
@@ -572,6 +654,7 @@ with st.sidebar:
 # ═════════════════════════════════════════════════════════════
 if st.session_state.page == "Deteksi Lesi Kulit":
 
+    render_mobile_nav()
     st.markdown('<h1 class="page-heading">Deteksi Lesi Kulit</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">Unggah citra dermoskopi untuk dianalisis oleh model MobileNetV2 — '
@@ -761,6 +844,7 @@ if st.session_state.page == "Deteksi Lesi Kulit":
 # ═════════════════════════════════════════════════════════════
 elif st.session_state.page == "Riwayat Prediksi":
 
+    render_mobile_nav()
     st.markdown('<h1 class="page-heading">Riwayat Prediksi</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">Seluruh sesi pemeriksaan yang telah dilakukan.</p>',
@@ -868,6 +952,7 @@ elif st.session_state.page == "Riwayat Prediksi":
 # ═════════════════════════════════════════════════════════════
 elif st.session_state.page == "Tentang Sistem":
 
+    render_mobile_nav()
     st.markdown('<h1 class="page-heading">Tentang Sistem</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">Informasi teknis, arsitektur model, dan kelas lesi kulit yang didukung.</p>',
