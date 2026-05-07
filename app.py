@@ -1,7 +1,7 @@
 """
 SPK Deteksi Dini Kanker Kulit
 MobileNetV2 + HAM10000 + Streamlit
-v3 — Mobile-first navigation fix
+Final version — 3 halaman: Deteksi, Riwayat, Tentang
 """
 
 import json
@@ -10,16 +10,17 @@ import base64
 from datetime import datetime
 
 import numpy as np
+import pandas as pd
 import streamlit as st
 import tensorflow as tf
 from PIL import Image
 
-# ── Page config ───────────────────────────────────────────────
+# ── Page config ──────────────────────────────────────────────
 st.set_page_config(
     page_title="SPK Deteksi Dini Kanker Kulit",
     page_icon="🔬",
     layout="wide",
-    initial_sidebar_state="auto",   # auto = expanded desktop, collapsed mobile
+    initial_sidebar_state="expanded",
 )
 
 # ═════════════════════════════════════════════════════════════
@@ -59,22 +60,16 @@ html, body, [class*="css"] {
   color: var(--t1) !important;
 }
 
-/* ── Hide Streamlit chrome on desktop, keep hamburger on mobile ── */
-#MainMenu { visibility: hidden; }
-footer    { visibility: hidden; }
-
-/* Hide deploy button only, NOT the whole header */
-header [data-testid="stToolbar"]           { visibility: hidden; }
-header [data-testid="stDecoration"]        { display: none; }
-
-/* On mobile: show header so hamburger (☰) stays accessible */
+#MainMenu, footer { visibility: hidden; }
+header { visibility: hidden; }
+/* Mobile: tampilkan header agar tombol hamburger (☰) tetap bisa diakses */
 @media (max-width: 768px) {
   header { visibility: visible !important; background: var(--bg2) !important; }
-  header [data-testid="stToolbar"] { visibility: hidden !important; }
+  header [data-testid="stToolbar"]    { visibility: hidden !important; }
+  header [data-testid="stDecoration"] { display: none !important; }
 }
-
 .block-container {
-  padding: 1.5rem 2rem 5rem !important;
+  padding: 2rem 2.5rem 4rem !important;
   max-width: 1080px;
 }
 
@@ -88,107 +83,93 @@ section[data-testid="stSidebar"] > div {
 }
 
 .brand-block { margin-bottom: 2.5rem; }
-.brand-icon  { font-size: 2rem; margin-bottom: 0.5rem; display: block; }
+.brand-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
 .brand-title {
   font-family: 'Syne', sans-serif;
-  font-size: 1rem; font-weight: 700;
-  color: var(--t1); line-height: 1.3; margin: 0 0 3px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--t1);
+  line-height: 1.3;
+  margin: 0 0 3px;
 }
 .brand-sub {
   font-family: 'DM Mono', monospace;
-  font-size: 0.68rem; color: var(--t3); margin: 0;
+  font-size: 0.68rem;
+  color: var(--t3);
+  margin: 0;
 }
 
 .nav-label {
-  font-size: 0.65rem; font-weight: 600;
-  letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--t3); margin: 0 0 0.6rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--t3);
+  margin: 0 0 0.6rem;
 }
 
 div[data-testid="stSidebar"] .stButton button {
-  width: 100% !important; text-align: left !important;
-  background: transparent !important; border: 1px solid transparent !important;
-  border-radius: var(--radius-sm) !important; color: var(--t2) !important;
-  font-family: 'DM Sans', sans-serif !important; font-size: 0.875rem !important;
-  font-weight: 400 !important; padding: 0.6rem 0.9rem !important;
-  margin-bottom: 3px !important; transition: all 0.15s ease !important;
+  width: 100% !important;
+  text-align: left !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--radius-sm) !important;
+  color: var(--t2) !important;
+  font-family: 'DM Sans', sans-serif !important;
+  font-size: 0.875rem !important;
+  font-weight: 400 !important;
+  padding: 0.6rem 0.9rem !important;
+  margin-bottom: 3px !important;
+  transition: all 0.15s ease !important;
+  letter-spacing: 0 !important;
 }
 div[data-testid="stSidebar"] .stButton button:hover {
-  background: var(--bg3) !important; border-color: var(--border) !important;
+  background: var(--bg3) !important;
+  border-color: var(--border) !important;
   color: var(--t1) !important;
 }
-.nav-active div[data-testid="stSidebar"] .stButton button {
-  background: var(--accent-dim) !important; border-color: var(--accent) !important;
-  color: #a8c0ff !important; font-weight: 500 !important;
+.nav-active div[data-testid="stSidebar"] .stButton button,
+.nav-active .stButton button {
+  background: var(--accent-dim) !important;
+  border-color: var(--accent) !important;
+  color: #a8c0ff !important;
+  font-weight: 500 !important;
 }
 
 .disc-box {
-  background: #1a1208; border: 1px solid #3d2e0a;
-  border-radius: var(--radius-sm); padding: 0.85rem; margin-top: 0.4rem;
+  background: #1a1208;
+  border: 1px solid #3d2e0a;
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
+  margin-top: 0.4rem;
 }
-.disc-box p { font-size: 0.78rem; color: #c8a83a; margin: 0; line-height: 1.65; }
+.disc-box p {
+  font-size: 0.78rem;
+  color: #c8a83a;
+  margin: 0;
+  line-height: 1.65;
+}
 .disc-box strong { color: #f0c040; }
-
-/* ── Mobile tab bar (st.radio styled) ────────────── */
-/* Hide on desktop */
-div[data-testid="stRadio"].mobile-tabs { display: none; }
-
-@media (max-width: 768px) {
-  /* Show on mobile */
-  div[data-testid="stRadio"].mobile-tabs {
-    display: block !important;
-    position: fixed !important;
-    bottom: 0 !important; left: 0 !important; right: 0 !important;
-    z-index: 9999 !important;
-    background: var(--bg2) !important;
-    border-top: 1px solid var(--border) !important;
-    box-shadow: 0 -4px 24px rgba(0,0,0,0.5) !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-  div[data-testid="stRadio"].mobile-tabs > label { display: none !important; }
-  div[data-testid="stRadio"].mobile-tabs [role="radiogroup"] {
-    display: flex !important; flex-direction: row !important;
-    gap: 0 !important; width: 100% !important;
-    padding: 0 !important; margin: 0 !important;
-  }
-  div[data-testid="stRadio"].mobile-tabs [role="radiogroup"] > label {
-    display: flex !important; flex: 1 !important;
-    flex-direction: column !important; align-items: center !important;
-    justify-content: center !important; gap: 3px !important;
-    height: 62px !important; cursor: pointer !important;
-    color: var(--t3) !important; font-size: 0.62rem !important;
-    font-weight: 500 !important; letter-spacing: 0.02em !important;
-    transition: color 0.15s, background 0.15s !important;
-    padding: 0 !important; margin: 0 !important;
-    border-radius: 0 !important;
-  }
-  div[data-testid="stRadio"].mobile-tabs [role="radiogroup"] > label:hover {
-    background: var(--bg3) !important; color: var(--t1) !important;
-  }
-  div[data-testid="stRadio"].mobile-tabs [role="radiogroup"] > label[data-checked="true"] {
-    color: var(--accent) !important;
-  }
-  /* Hide the actual radio circle */
-  div[data-testid="stRadio"].mobile-tabs input[type="radio"] { display: none !important; }
-  div[data-testid="stRadio"].mobile-tabs [data-testid="stMarkdownContainer"] { display: none !important; }
-  /* Push content above bottom bar */
-  .block-container { padding-bottom: 80px !important; }
-  /* Responsive adjustments */
-  .page-heading  { font-size: 1.4rem !important; }
-  .page-sub      { font-size: 0.82rem !important; margin-bottom: 1rem !important; }
-  .pbar-name     { width: 120px !important; font-size: 0.72rem !important; }
-  .info-card     { padding: 0.8rem 0.9rem !important; }
-  .result-wrap   { padding: 1rem !important; }
-  .conf-value    { font-size: 1.6rem !important; }
-}
 
 /* ── Page heading ─────────────────────────────────── */
 .page-heading {
-  font-family: 'Syne', sans-serif; font-size: 2rem; font-weight: 800;
-  color: var(--t1); letter-spacing: -0.03em; margin: 0 0 4px; line-height: 1.15;
+  font-family: 'Syne', sans-serif;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--t1);
+  letter-spacing: -0.03em;
+  margin: 0 0 4px;
+  line-height: 1.15;
 }
-.page-sub { font-size: 0.88rem; color: var(--t3); margin: 0 0 2rem; }
+.page-sub {
+  font-size: 0.88rem;
+  color: var(--t3);
+  margin: 0 0 2rem;
+}
 
 /* ── Upload zone ──────────────────────────────────── */
 div[data-testid="stFileUploader"] {
@@ -197,30 +178,42 @@ div[data-testid="stFileUploader"] {
   border-radius: var(--radius) !important;
   transition: border-color 0.2s !important;
 }
-div[data-testid="stFileUploader"]:hover { border-color: var(--accent) !important; }
+div[data-testid="stFileUploader"]:hover {
+  border-color: var(--accent) !important;
+}
 div[data-testid="stFileUploader"] label { display: none !important; }
 
 .upload-hint {
-  text-align: center; padding: 0.4rem 0 0.8rem;
-  font-size: 0.78rem; color: var(--t3);
+  text-align: center;
+  padding: 0.4rem 0 0.8rem;
+  font-size: 0.78rem;
+  color: var(--t3);
 }
 .upload-hint span {
-  display: inline-block; background: var(--bg4);
-  border: 1px solid var(--border2); border-radius: 99px;
-  padding: 2px 10px; font-family: 'DM Mono', monospace;
-  font-size: 0.7rem; margin: 0 2px;
+  display: inline-block;
+  background: var(--bg4);
+  border: 1px solid var(--border2);
+  border-radius: 99px;
+  padding: 2px 10px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.7rem;
+  margin: 0 2px;
 }
 
 /* ── Buttons ──────────────────────────────────────── */
 .stButton button {
   border-radius: var(--radius-sm) !important;
   font-family: 'DM Sans', sans-serif !important;
-  font-weight: 500 !important; font-size: 0.875rem !important;
-  transition: all 0.18s ease !important; letter-spacing: 0.01em !important;
+  font-weight: 500 !important;
+  font-size: 0.875rem !important;
+  transition: all 0.18s ease !important;
+  letter-spacing: 0.01em !important;
 }
 .stButton button[kind="primary"] {
-  background: var(--accent) !important; border: none !important;
-  color: #fff !important; padding: 0.65rem 1.4rem !important;
+  background: var(--accent) !important;
+  border: none !important;
+  color: #fff !important;
+  padding: 0.65rem 1.4rem !important;
 }
 .stButton button[kind="primary"]:hover {
   background: #3a68f5 !important;
@@ -228,24 +221,34 @@ div[data-testid="stFileUploader"] label { display: none !important; }
   transform: translateY(-1px) !important;
 }
 .stButton button[kind="secondary"] {
-  background: var(--bg3) !important; border: 1px solid var(--border2) !important;
-  color: var(--t2) !important; padding: 0.65rem 1.4rem !important;
+  background: var(--bg3) !important;
+  border: 1px solid var(--border2) !important;
+  color: var(--t2) !important;
+  padding: 0.65rem 1.4rem !important;
 }
 .stButton button[kind="secondary"]:hover {
-  background: var(--bg4) !important; border-color: var(--t3) !important;
+  background: var(--bg4) !important;
+  border-color: var(--t3) !important;
   color: var(--t1) !important;
 }
 
 /* ── Section label ────────────────────────────────── */
 .slabel {
-  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.13em;
-  text-transform: uppercase; color: var(--t3); margin: 0 0 0.7rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--t3);
+  margin: 0 0 0.7rem;
 }
 
 /* ── Result panel ─────────────────────────────────── */
 .result-wrap {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1.4rem; margin-bottom: 0.8rem;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.4rem;
+  margin-bottom: 0.8rem;
 }
 .result-wrap.danger  { border-color: var(--red);    background: linear-gradient(135deg, var(--red-dim) 0%, var(--bg2) 60%); }
 .result-wrap.warning { border-color: var(--orange); background: linear-gradient(135deg, var(--orange-dim) 0%, var(--bg2) 60%); }
@@ -260,7 +263,8 @@ div[data-testid="stFileUploader"] label { display: none !important; }
 .badge {
   display: inline-flex; align-items: center; gap: 5px;
   font-size: 0.72rem; font-weight: 600;
-  padding: 3px 10px; border-radius: 99px; border: 1px solid transparent;
+  padding: 3px 10px; border-radius: 99px;
+  border: 1px solid transparent;
 }
 .badge.danger  { background: var(--red-dim);    color: #ff8fa3; border-color: #5a1425; }
 .badge.warning { background: var(--orange-dim); color: #ffb380; border-color: #5a3010; }
@@ -268,7 +272,8 @@ div[data-testid="stFileUploader"] label { display: none !important; }
 
 .conf-value {
   font-family: 'DM Mono', monospace;
-  font-size: 2rem; font-weight: 500; color: var(--t1); line-height: 1;
+  font-size: 2rem; font-weight: 500;
+  color: var(--t1); line-height: 1;
 }
 
 /* ── Probability bars ─────────────────────────────── */
@@ -279,32 +284,46 @@ div[data-testid="stFileUploader"] label { display: none !important; }
 .pbar-fill.danger  { background: var(--red); }
 .pbar-fill.warning { background: var(--orange); }
 .pbar-fill.safe    { background: var(--green); }
+.pbar-fill.accent  { background: var(--accent); }
 .pbar-pct { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--t3); width: 42px; text-align: right; flex-shrink: 0; }
 
 /* ── Reco box ─────────────────────────────────────── */
 .reco-box {
-  background: var(--bg3); border: 1px solid var(--border2);
-  border-left: 3px solid var(--accent); border-radius: var(--radius-sm);
-  padding: 0.9rem 1rem; margin-top: 0.8rem;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 0.9rem 1rem;
+  margin-top: 0.8rem;
 }
 .reco-box p { font-size: 0.82rem; color: var(--t2); margin: 0; line-height: 1.75; }
 
 /* ── Preview image card ───────────────────────────── */
 .img-card {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--radius); overflow: hidden; margin-bottom: 0.8rem;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 0.8rem;
 }
 .img-card-footer {
-  padding: 8px 12px; font-size: 0.75rem; color: var(--t3);
-  font-family: 'DM Mono', monospace; border-top: 1px solid var(--border);
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  color: var(--t3);
+  font-family: 'DM Mono', monospace;
+  border-top: 1px solid var(--border);
   background: var(--bg3);
 }
+
+/* ── Divider ──────────────────────────────────────── */
+hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
 
 /* ── Riwayat table ────────────────────────────────── */
 .rtable-head {
   display: grid;
   grid-template-columns: 36px 130px 52px 1fr 100px 90px;
-  gap: 0; background: var(--bg3);
+  gap: 0;
+  background: var(--bg3);
   border: 1px solid var(--border);
   border-radius: var(--radius) var(--radius) 0 0;
   padding: 10px 14px;
@@ -316,19 +335,26 @@ div[data-testid="stFileUploader"] label { display: none !important; }
 
 /* ── Tentang cards ────────────────────────────────── */
 .info-card {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1.1rem 1.2rem;
-  margin-bottom: 0.7rem; transition: border-color 0.2s;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.2rem;
+  margin-bottom: 0.7rem;
+  transition: border-color 0.2s;
 }
 .info-card:hover { border-color: var(--border2); }
 .info-card-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--t3); margin-bottom: 4px; }
 .info-card-value { font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 600; color: var(--t1); }
 
 .kelas-row {
-  display: flex; align-items: center; justify-content: space-between;
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 0.65rem 0.9rem;
-  margin-bottom: 6px; transition: border-color 0.15s;
+  display: flex; align-items: center;
+  justify-content: space-between;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.9rem;
+  margin-bottom: 6px;
+  transition: border-color 0.15s;
 }
 .kelas-row:hover { border-color: var(--border2); }
 .kelas-name { font-size: 0.85rem; font-weight: 500; color: var(--t1); }
@@ -336,25 +362,82 @@ div[data-testid="stFileUploader"] label { display: none !important; }
 
 /* ── Disclaimer strip ─────────────────────────────── */
 .disc-strip {
-  background: var(--bg3); border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 0.7rem 1rem;
-  font-size: 0.78rem; color: var(--t3); line-height: 1.6; margin-top: 0.8rem;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 1rem;
+  font-size: 0.78rem;
+  color: var(--t3);
+  line-height: 1.6;
+  margin-top: 0.8rem;
 }
 
-/* ── Stat chip ────────────────────────────────────── */
+/* ── Progress bar override ────────────────────────── */
+.stProgress > div > div { background: var(--accent) !important; border-radius: 99px !important; }
+
+/* ── Streamlit image ──────────────────────────────── */
+div[data-testid="caption"] { font-size: 0.72rem !important; color: var(--t3) !important; }
+
+/* ── Spinner ──────────────────────────────────────── */
+div[data-testid="stSpinner"] p { color: var(--t2) !important; font-size: 0.85rem !important; }
+
+/* ── stat chip ────────────────────────────────────── */
 .stat-chip {
   display: inline-flex; align-items: center; gap: 6px;
   background: var(--bg3); border: 1px solid var(--border2);
   border-radius: 99px; padding: 4px 12px;
-  font-size: 0.75rem; color: var(--t2); font-family: 'DM Mono', monospace;
+  font-size: 0.75rem; color: var(--t2);
+  font-family: 'DM Mono', monospace;
 }
 .stat-chip b { color: var(--t1); font-weight: 500; }
 
-/* ── Misc ─────────────────────────────────────────── */
-hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
-div[data-testid="caption"] { font-size: 0.72rem !important; color: var(--t3) !important; }
-div[data-testid="stSpinner"] p { color: var(--t2) !important; font-size: 0.85rem !important; }
-.stProgress > div > div { background: var(--accent) !important; border-radius: 99px !important; }
+/* ── Mobile bottom navigation bar ────────────────── */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 9999;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.5);
+}
+.mobile-nav-inner {
+  display: flex;
+  align-items: stretch;
+  height: 62px;
+}
+.mobile-nav-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--t3);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  background: transparent;
+  transition: color 0.15s, background 0.15s;
+  padding: 0 4px;
+  text-decoration: none;
+  border: none;
+}
+.mobile-nav-btn:hover { color: var(--t1); background: var(--bg3); }
+.mobile-nav-btn.active { color: var(--accent) !important; }
+.mobile-nav-btn .nav-icon { font-size: 1.3rem; line-height: 1; }
+.mobile-nav-btn .nav-text { font-size: 0.58rem; letter-spacing: 0.02em; }
+
+@media (max-width: 768px) {
+  .mobile-nav { display: block; }
+  .block-container { padding-bottom: 80px !important; }
+  .page-heading { font-size: 1.5rem !important; }
+  .page-sub { font-size: 0.82rem !important; margin-bottom: 1.2rem !important; }
+  .pbar-name { width: 130px !important; font-size: 0.72rem !important; }
+  .info-card { padding: 0.8rem 0.9rem !important; }
+  .result-wrap { padding: 1rem !important; }
+  .conf-value { font-size: 1.6rem !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -363,53 +446,109 @@ div[data-testid="stSpinner"] p { color: var(--t2) !important; font-size: 0.85rem
 # ═════════════════════════════════════════════════════════════
 CLASS_INFO = {
     "akiec": {
-        "name": "Actinic Keratoses", "kategori": "Pra-kanker",
-        "variant": "warning", "warna": "🟠",
-        "rekomendasi": "Lesi pra-kanker akibat paparan sinar UV berlebih. Segera periksakan ke dokter spesialis kulit untuk penanganan dini sebelum berkembang menjadi karsinoma sel skuamosa.",
+        "name": "Actinic Keratoses",
+        "kategori": "Pra-kanker",
+        "variant": "warning",
+        "warna": "🟠",
+        "rekomendasi": (
+            "Lesi pra-kanker akibat paparan sinar UV berlebih. "
+            "Segera periksakan ke dokter spesialis kulit untuk penanganan dini "
+            "sebelum berkembang menjadi karsinoma sel skuamosa."
+        ),
     },
     "bcc": {
-        "name": "Basal Cell Carcinoma", "kategori": "Ganas (Kanker)",
-        "variant": "danger", "warna": "🔴",
-        "rekomendasi": "Kanker kulit yang memerlukan penanganan medis segera. Meskipun jarang bermetastasis, BCC dapat merusak jaringan sekitar. Segera konsultasikan ke dermatologis.",
+        "name": "Basal Cell Carcinoma",
+        "kategori": "Ganas (Kanker)",
+        "variant": "danger",
+        "warna": "🔴",
+        "rekomendasi": (
+            "Kanker kulit yang memerlukan penanganan medis segera. "
+            "Meskipun jarang bermetastasis, BCC dapat merusak jaringan sekitar. "
+            "Segera konsultasikan ke dermatologis."
+        ),
     },
     "bkl": {
-        "name": "Benign Keratosis", "kategori": "Jinak",
-        "variant": "safe", "warna": "🟢",
-        "rekomendasi": "Lesi jinak meliputi seborrheic keratoses dan solar lentigo. Umumnya tidak berbahaya. Tetap disarankan pemeriksaan klinis untuk konfirmasi diagnosis.",
+        "name": "Benign Keratosis",
+        "kategori": "Jinak",
+        "variant": "safe",
+        "warna": "🟢",
+        "rekomendasi": (
+            "Lesi jinak meliputi seborrheic keratoses dan solar lentigo. "
+            "Umumnya tidak berbahaya. Tetap disarankan pemeriksaan klinis "
+            "untuk konfirmasi diagnosis."
+        ),
     },
     "df": {
-        "name": "Dermatofibroma", "kategori": "Jinak",
-        "variant": "safe", "warna": "🟢",
-        "rekomendasi": "Benjolan jinak pada kulit. Umumnya tidak memerlukan pengobatan kecuali mengganggu aktivitas atau terdapat perubahan yang mencurigakan.",
+        "name": "Dermatofibroma",
+        "kategori": "Jinak",
+        "variant": "safe",
+        "warna": "🟢",
+        "rekomendasi": (
+            "Benjolan jinak pada kulit. Umumnya tidak memerlukan pengobatan "
+            "kecuali mengganggu aktivitas atau terdapat perubahan yang mencurigakan."
+        ),
     },
     "mel": {
-        "name": "Melanoma", "kategori": "Ganas (Kanker)",
-        "variant": "danger", "warna": "🔴",
-        "rekomendasi": "Melanoma adalah kanker kulit paling berbahaya yang berasal dari sel melanosit. Deteksi dini sangat menentukan keberhasilan pengobatan. Segera periksakan ke dermatologis.",
+        "name": "Melanoma",
+        "kategori": "Ganas (Kanker)",
+        "variant": "danger",
+        "warna": "🔴",
+        "rekomendasi": (
+            "Melanoma adalah kanker kulit paling berbahaya yang berasal dari sel melanosit. "
+            "Deteksi dini sangat menentukan keberhasilan pengobatan. "
+            "Segera periksakan ke dermatologis untuk tindak lanjut klinis."
+        ),
     },
     "nv": {
-        "name": "Melanocytic Nevi", "kategori": "Jinak",
-        "variant": "safe", "warna": "🟢",
-        "rekomendasi": "Tahi lalat biasa yang bersifat jinak. Pantau secara berkala menggunakan kriteria ABCDE. Konsultasikan jika ada perubahan ukuran, warna, atau bentuk.",
+        "name": "Melanocytic Nevi",
+        "kategori": "Jinak",
+        "variant": "safe",
+        "warna": "🟢",
+        "rekomendasi": (
+            "Tahi lalat biasa yang bersifat jinak. Pantau secara berkala "
+            "menggunakan kriteria ABCDE. Konsultasikan jika ada perubahan "
+            "ukuran, warna, atau bentuk."
+        ),
     },
     "vasc": {
-        "name": "Vascular Lesions", "kategori": "Jinak",
-        "variant": "safe", "warna": "🟢",
-        "rekomendasi": "Lesi pembuluh darah seperti hemangioma dan angioma. Umumnya jinak. Konsultasikan ke dokter jika membesar atau berdarah.",
+        "name": "Vascular Lesions",
+        "kategori": "Jinak",
+        "variant": "safe",
+        "warna": "🟢",
+        "rekomendasi": (
+            "Lesi pembuluh darah seperti hemangioma dan angioma. "
+            "Umumnya jinak. Konsultasikan ke dokter jika membesar atau berdarah."
+        ),
     },
 }
 
 # ═════════════════════════════════════════════════════════════
 # SESSION STATE
 # ═════════════════════════════════════════════════════════════
-for k, v in {
-    "riwayat": [], "hasil": None, "img_pil": None, "img_name": ""
+for key, val in {
+    "page": "Deteksi Lesi Kulit",
+    "riwayat": [],
+    "hasil": None,
+    "img_pil": None,
+    "img_name": "",
 }.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+    if key not in st.session_state:
+        st.session_state[key] = val
+
+# ── Handle mobile nav via query params ───────────────────────
+_NAV_PARAM_MAP = {
+    "deteksi":  "Deteksi Lesi Kulit",
+    "riwayat":  "Riwayat Prediksi",
+    "tentang":  "Tentang Sistem",
+}
+_qp = st.query_params.get("nav", "")
+if _qp in _NAV_PARAM_MAP:
+    st.session_state.page = _NAV_PARAM_MAP[_qp]
+    st.query_params.clear()
+    st.rerun()
 
 # ═════════════════════════════════════════════════════════════
-# MODEL
+# MODEL LOAD
 # ═════════════════════════════════════════════════════════════
 @st.cache_resource(show_spinner=False)
 def load_assets():
@@ -420,14 +559,44 @@ def load_assets():
 
 def preprocess(img: Image.Image) -> np.ndarray:
     img = img.convert("RGB").resize((224, 224))
-    return np.expand_dims(np.array(img, dtype=np.float32) / 255.0, axis=0)
+    arr = np.array(img, dtype=np.float32) / 255.0
+    return np.expand_dims(arr, axis=0)
 
-def to_b64(img: Image.Image, size=(56, 56)) -> str:
+def img_to_b64(img: Image.Image, size=(56, 56)) -> str:
+    t = img.copy().convert("RGB")
+    t.thumbnail(size)
+    buf = io.BytesIO()
+    t.save(buf, format="JPEG", quality=75)
+    return base64.b64decode(base64.b64encode(buf.getvalue())).decode()
+
+def img_b64_str(img: Image.Image, size=(56, 56)) -> str:
     t = img.copy().convert("RGB")
     t.thumbnail(size)
     buf = io.BytesIO()
     t.save(buf, format="JPEG", quality=75)
     return base64.b64encode(buf.getvalue()).decode()
+
+def render_mobile_nav():
+    """Fixed bottom navigation bar — visible only on mobile via CSS media query."""
+    cur = st.session_state.page
+    pages = [
+        ("deteksi", "🔍", "Deteksi",  "Deteksi Lesi Kulit"),
+        ("riwayat", "📋", "Riwayat",  "Riwayat Prediksi"),
+        ("tentang", "ℹ️", "Tentang",  "Tentang Sistem"),
+    ]
+    btns = ""
+    for param, icon, label, page in pages:
+        active = "active" if cur == page else ""
+        btns += (
+            f'<a class="mobile-nav-btn {active}" href="?nav={param}">'
+            f'<span class="nav-icon">{icon}</span>'
+            f'<span class="nav-text">{label}</span>'
+            f'</a>'
+        )
+    st.markdown(
+        f'<div class="mobile-nav"><div class="mobile-nav-inner">{btns}</div></div>',
+        unsafe_allow_html=True,
+    )
 
 try:
     model, label_map = load_assets()
@@ -441,10 +610,8 @@ except Exception as _e:
     _model_err = str(_e)
 
 # ═════════════════════════════════════════════════════════════
-# SIDEBAR  (desktop nav)
+# SIDEBAR
 # ═════════════════════════════════════════════════════════════
-NAV_PAGES = ["🔍  Deteksi Lesi Kulit", "📋  Riwayat Prediksi", "ℹ️  Tentang Sistem"]
-
 with st.sidebar:
     st.markdown("""
     <div class="brand-block">
@@ -456,15 +623,18 @@ with st.sidebar:
 
     st.markdown('<p class="nav-label">Menu</p>', unsafe_allow_html=True)
 
-    # Desktop sidebar nav buttons
-    for pg in NAV_PAGES:
-        label = pg.split("  ", 1)[1]
-        active = st.session_state.get("page", NAV_PAGES[0]) == pg
+    nav_items = [
+        ("Deteksi Lesi Kulit", "🔍"),
+        ("Riwayat Prediksi",   "📋"),
+        ("Tentang Sistem",     "ℹ️"),
+    ]
+    for page, icon in nav_items:
+        active = st.session_state.page == page
         wrap = st.container()
         if active:
             wrap.markdown('<div class="nav-active">', unsafe_allow_html=True)
-        if wrap.button(pg, key=f"sb_{pg}", use_container_width=True):
-            st.session_state.page = pg
+        if wrap.button(f"{icon}  {page}", key=f"nav_{page}", use_container_width=True):
+            st.session_state.page = page
             st.rerun()
         if active:
             wrap.markdown("</div>", unsafe_allow_html=True)
@@ -478,76 +648,51 @@ with st.sidebar:
       Hasil prediksi wajib dikonfirmasi oleh dokter spesialis kulit.</p>
     </div>
     """, unsafe_allow_html=True)
+
     st.markdown("---")
     st.markdown(
         '<p style="font-size:.68rem;color:#2e3550;text-align:center">'
-        'v1.0 — Tugas Akhir IF 2025</p>', unsafe_allow_html=True)
-
-# ═════════════════════════════════════════════════════════════
-# MOBILE TOP NAV — st.radio horizontal, styled as bottom bar via CSS
-# ═════════════════════════════════════════════════════════════
-# Initialize page state
-if "page" not in st.session_state:
-    st.session_state.page = NAV_PAGES[0]
-
-# Render mobile radio nav (hidden on desktop via CSS, shown on mobile as bottom bar)
-# We use a container with a specific class injected via JS workaround
-mobile_nav_container = st.container()
-with mobile_nav_container:
-    mobile_page = st.radio(
-        "nav",
-        options=NAV_PAGES,
-        index=NAV_PAGES.index(st.session_state.page)
-              if st.session_state.page in NAV_PAGES else 0,
-        horizontal=True,
-        label_visibility="collapsed",
-        key="mobile_radio",
+        'v1.0 — Tugas Akhir IF 2025</p>',
+        unsafe_allow_html=True,
     )
-
-# Add the class to this specific radio via JS injection
-st.markdown("""
-<script>
-(function() {
-  const radios = window.parent.document.querySelectorAll('[data-testid="stRadio"]');
-  if (radios.length > 0) {
-    radios[radios.length - 1].classList.add('mobile-tabs');
-  }
-})();
-</script>
-""", unsafe_allow_html=True)
-
-# Sync mobile radio selection to page state
-if mobile_page != st.session_state.page:
-    st.session_state.page = mobile_page
-    st.rerun()
-
-current_page = st.session_state.page
 
 # ═════════════════════════════════════════════════════════════
 # ── HALAMAN 1: DETEKSI LESI KULIT ────────────────────────────
 # ═════════════════════════════════════════════════════════════
-if current_page == NAV_PAGES[0]:
+if st.session_state.page == "Deteksi Lesi Kulit":
 
+    render_mobile_nav()
     st.markdown('<h1 class="page-heading">Deteksi Lesi Kulit</h1>', unsafe_allow_html=True)
     st.markdown(
-        '<p class="page-sub">Unggah citra dermoskopi — hasil tampil langsung di halaman ini.</p>',
-        unsafe_allow_html=True)
+        '<p class="page-sub">Unggah citra dermoskopi untuk dianalisis oleh model MobileNetV2 — '
+        'hasil tampil langsung di halaman ini.</p>',
+        unsafe_allow_html=True,
+    )
 
     if not model_ok:
         st.error(f"❌ Gagal memuat model: {_model_err}")
         st.stop()
 
+    # ── Two-column layout ──
     col_left, col_right = st.columns([1, 1.25], gap="large")
 
+    # ── LEFT: upload + image preview ──
     with col_left:
         st.markdown('<p class="slabel">Unggah Citra</p>', unsafe_allow_html=True)
-        uploaded = st.file_uploader("upload", type=["jpg", "jpeg", "png"],
-                                    label_visibility="collapsed")
+
+        uploaded = st.file_uploader(
+            "upload",
+            type=["jpg", "jpeg", "png"],
+            label_visibility="collapsed",
+        )
+
         st.markdown(
             '<div class="upload-hint">Format: <span>JPG</span> <span>JPEG</span>'
             ' <span>PNG</span> · Maks. <span>5 MB</span></div>',
-            unsafe_allow_html=True)
+            unsafe_allow_html=True,
+        )
 
+        # Handle file
         if uploaded is not None:
             if uploaded.size > 5 * 1024 * 1024:
                 st.error("❌ File melebihi 5 MB.")
@@ -555,21 +700,28 @@ if current_page == NAV_PAGES[0]:
                 st.session_state.img_pil  = Image.open(uploaded)
                 st.session_state.img_name = uploaded.name
 
+        # Show preview
         if st.session_state.img_pil is not None:
             st.markdown('<div class="img-card">', unsafe_allow_html=True)
             st.image(st.session_state.img_pil, use_container_width=True)
             st.markdown(
                 f'<div class="img-card-footer">📎 {st.session_state.img_name}</div>',
-                unsafe_allow_html=True)
+                unsafe_allow_html=True,
+            )
             st.markdown("</div>", unsafe_allow_html=True)
 
+        # ── Buttons ──
         c1, c2 = st.columns(2, gap="small")
         with c1:
-            run_btn = st.button("Analisis Sekarang", type="primary",
-                                use_container_width=True, key="btn_run")
+            run_btn = st.button(
+                "Analisis Sekarang", type="primary",
+                use_container_width=True, key="btn_run",
+            )
         with c2:
-            reset_btn = st.button("Reset", type="secondary",
-                                  use_container_width=True, key="btn_reset")
+            reset_btn = st.button(
+                "Reset", type="secondary",
+                use_container_width=True, key="btn_reset",
+            )
 
         if reset_btn:
             st.session_state.img_pil  = None
@@ -582,8 +734,8 @@ if current_page == NAV_PAGES[0]:
                 st.warning("⚠️ Unggah citra terlebih dahulu.")
             else:
                 with st.spinner("Menganalisis citra…"):
-                    preds = model.predict(preprocess(st.session_state.img_pil),
-                                         verbose=0)[0]
+                    arr  = preprocess(st.session_state.img_pil)
+                    preds = model.predict(arr, verbose=0)[0]
 
                 top_i   = int(np.argmax(preds))
                 top_lbl = idx2label[top_i]
@@ -596,33 +748,44 @@ if current_page == NAV_PAGES[0]:
                       "prob": float(preds[i]),
                       "variant": CLASS_INFO.get(idx2label[i], {}).get("variant", "safe")}
                      for i in range(len(preds))],
-                    key=lambda x: x["prob"], reverse=True)
+                    key=lambda x: x["prob"], reverse=True,
+                )
 
                 st.session_state.hasil = {
-                    "label": top_lbl, "name": info.get("name", top_lbl),
+                    "label":    top_lbl,
+                    "name":     info.get("name", top_lbl),
                     "kategori": info.get("kategori", "-"),
                     "variant":  info.get("variant", "safe"),
-                    "conf":     top_conf, "reko": info.get("rekomendasi", ""),
+                    "conf":     top_conf,
+                    "reko":     info.get("rekomendasi", ""),
                     "probs":    all_probs,
                     "waktu":    datetime.now().strftime("%d %b %Y, %H:%M"),
+                    "img_b64":  img_b64_str(st.session_state.img_pil),
+                    "img_name": st.session_state.img_name,
                 }
+
+                # Simpan ke riwayat
                 st.session_state.riwayat.append({
                     "waktu":    st.session_state.hasil["waktu"],
-                    "img_b64":  to_b64(st.session_state.img_pil),
+                    "img_b64":  st.session_state.hasil["img_b64"],
                     "prediksi": f"{info.get('name', top_lbl)} ({top_lbl})",
                     "prob":     f"{top_conf*100:.1f}%",
                     "status":   info.get("kategori", "-"),
                     "variant":  info.get("variant", "safe"),
                 })
+
                 st.rerun()
 
         st.markdown(
             '<div class="disc-strip">Hasil analisis ini bersifat sebagai alat bantu skrining awal '
             '(second opinion) dan bukan pengganti diagnosis klinis oleh dokter spesialis kulit.</div>',
-            unsafe_allow_html=True)
+            unsafe_allow_html=True,
+        )
 
+    # ── RIGHT: hasil prediksi ──
     with col_right:
         if st.session_state.hasil is None:
+            # Empty state
             st.markdown("""
             <div style="height:100%;min-height:380px;display:flex;flex-direction:column;
                         align-items:center;justify-content:center;text-align:center;
@@ -630,8 +793,7 @@ if current_page == NAV_PAGES[0]:
                         border-radius:var(--radius);padding:2.5rem">
               <div style="font-size:2.5rem;margin-bottom:1rem;opacity:.4">🩺</div>
               <p style="font-size:.9rem;color:var(--t3);max-width:220px;line-height:1.6;margin:0">
-                Unggah citra dan klik
-                <strong style="color:var(--t2)">Analisis Sekarang</strong>
+                Unggah citra dan klik <strong style="color:var(--t2)">Analisis Sekarang</strong>
                 untuk melihat hasil prediksi di sini
               </p>
             </div>
@@ -639,41 +801,44 @@ if current_page == NAV_PAGES[0]:
         else:
             h = st.session_state.hasil
             v = h["variant"]
-            icon = "⚠" if v == "warning" else ("✕" if v == "danger" else "✓")
 
+            # ── Prediksi utama ──
             st.markdown('<p class="slabel">Hasil Prediksi</p>', unsafe_allow_html=True)
-
             st.markdown(f"""
             <div class="result-wrap {v}">
               <div class="result-label">Prediksi Utama</div>
               <div class="result-name {v}">{h['name']}</div>
-              <span class="badge {v}">{icon} {h['kategori']}</span>
+              <span class="badge {v}">
+                {'⚠' if v=='warning' else ('✕' if v=='danger' else '✓')} {h['kategori']}
+              </span>
             </div>
+            """, unsafe_allow_html=True)
 
+            # ── Confidence ──
+            st.markdown(f"""
             <div class="result-wrap" style="padding:1rem 1.4rem">
               <div class="result-label">Tingkat Keyakinan</div>
               <div class="conf-value">{h['conf']*100:.1f}%</div>
             </div>
             """, unsafe_allow_html=True)
 
-            st.markdown('<p class="slabel" style="margin-top:.5rem">Distribusi Probabilitas</p>',
-                        unsafe_allow_html=True)
+            # ── Probability bars ──
+            st.markdown('<p class="slabel" style="margin-top:.5rem">Distribusi Probabilitas</p>', unsafe_allow_html=True)
             max_p = h["probs"][0]["prob"] if h["probs"] else 1
-            bars = ""
+            bars_html = ""
             for item in h["probs"]:
-                w = (item["prob"] / max_p * 100) if max_p > 0 else 0
-                bars += f"""
+                width = (item["prob"] / max_p * 100) if max_p > 0 else 0
+                bars_html += f"""
                 <div class="pbar-row">
-                  <div class="pbar-name">{item['name']}
-                    <span style="color:var(--t3);font-size:.7rem">({item['label']})</span>
-                  </div>
+                  <div class="pbar-name">{item['name']} <span style="color:var(--t3);font-size:.7rem">({item['label']})</span></div>
                   <div class="pbar-track">
-                    <div class="pbar-fill {item['variant']}" style="width:{w:.1f}%"></div>
+                    <div class="pbar-fill {item['variant']}" style="width:{width:.1f}%"></div>
                   </div>
                   <div class="pbar-pct">{item['prob']*100:.1f}%</div>
                 </div>"""
-            st.markdown(bars, unsafe_allow_html=True)
+            st.markdown(bars_html, unsafe_allow_html=True)
 
+            # ── Rekomendasi ──
             st.markdown(f"""
             <div class="reco-box">
               <div class="result-label" style="margin-bottom:5px">Rekomendasi Medis</div>
@@ -684,11 +849,14 @@ if current_page == NAV_PAGES[0]:
 # ═════════════════════════════════════════════════════════════
 # ── HALAMAN 2: RIWAYAT PREDIKSI ──────────────────────────────
 # ═════════════════════════════════════════════════════════════
-elif current_page == NAV_PAGES[1]:
+elif st.session_state.page == "Riwayat Prediksi":
 
+    render_mobile_nav()
     st.markdown('<h1 class="page-heading">Riwayat Prediksi</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="page-sub">Seluruh sesi pemeriksaan yang telah dilakukan.</p>',
-                unsafe_allow_html=True)
+    st.markdown(
+        '<p class="page-sub">Seluruh sesi pemeriksaan yang telah dilakukan.</p>',
+        unsafe_allow_html=True,
+    )
 
     if not st.session_state.riwayat:
         st.markdown("""
@@ -702,15 +870,17 @@ elif current_page == NAV_PAGES[1]:
         """, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("← Mulai Deteksi", type="primary", key="go_deteksi"):
-            st.session_state.page = NAV_PAGES[0]
+            st.session_state.page = "Deteksi Lesi Kulit"
             st.rerun()
     else:
         n = len(st.session_state.riwayat)
-        st.markdown(f'<p class="stat-chip"><b>{n}</b> pemeriksaan tercatat</p>',
-                    unsafe_allow_html=True)
+        st.markdown(
+            f'<p class="stat-chip"><b>{n}</b> pemeriksaan tercatat</p>',
+            unsafe_allow_html=True,
+        )
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Header
+        # ── Header ──
         st.markdown("""
         <div class="rtable-head">
           <span class="rtable-hcell">No</span>
@@ -722,46 +892,54 @@ elif current_page == NAV_PAGES[1]:
         </div>
         """, unsafe_allow_html=True)
 
-        # Rows
+        # ── Rows — native Streamlit columns ──
         rev = list(reversed(st.session_state.riwayat))
         for i, r in enumerate(rev, 1):
             is_last = i == len(rev)
-            br  = f"0 0 12px 12px" if is_last else "0"
-            bg  = "#111420" if i % 2 == 0 else "#0f1220"
-            s   = (f"background:{bg};border-left:1px solid #252a40;"
-                   f"border-right:1px solid #252a40;border-bottom:1px solid #252a40;"
-                   f"border-radius:{br};padding:9px 5px;")
+            br = f"0 0 {12}px {12}px" if is_last else "0"
+            bg = "#111420" if i % 2 == 0 else "#0f1220"
+            s = (f"background:{bg};border-left:1px solid #252a40;"
+                 f"border-right:1px solid #252a40;border-bottom:1px solid #252a40;"
+                 f"border-radius:{br};padding:9px 5px;")
 
             cno, cwk, cim, cpd, cpr, cst = st.columns([0.36, 1.3, 0.52, 2.0, 0.95, 0.9])
+
             with cno:
-                st.markdown(f'<div style="{s}padding-left:14px;color:#4a5270;'
-                            f'font-size:.82rem;line-height:46px">{i}</div>',
-                            unsafe_allow_html=True)
+                st.markdown(
+                    f'<div style="{s}padding-left:14px;color:#4a5270;'
+                    f'font-size:.82rem;line-height:46px">{i}</div>',
+                    unsafe_allow_html=True)
             with cwk:
-                st.markdown(f'<div style="{s}color:#8892b0;font-size:.78rem;'
-                            f'padding-top:9px;line-height:1.45">{r["waktu"]}</div>',
-                            unsafe_allow_html=True)
+                st.markdown(
+                    f'<div style="{s}color:#8892b0;font-size:.78rem;'
+                    f'padding-top:9px;line-height:1.45">{r["waktu"]}</div>',
+                    unsafe_allow_html=True)
             with cim:
                 st.markdown(f'<div style="{s}">', unsafe_allow_html=True)
                 try:
-                    thumb = Image.open(io.BytesIO(base64.b64decode(r["img_b64"])))
+                    img_bytes = base64.b64decode(r["img_b64"])
+                    thumb = Image.open(io.BytesIO(img_bytes))
                     st.image(thumb, width=44)
                 except Exception:
                     st.markdown("—")
                 st.markdown("</div>", unsafe_allow_html=True)
             with cpd:
-                st.markdown(f'<div style="{s}color:#eef0f8;font-size:.82rem;'
-                            f'padding-top:9px;line-height:1.45">{r["prediksi"]}</div>',
-                            unsafe_allow_html=True)
+                st.markdown(
+                    f'<div style="{s}color:#eef0f8;font-size:.82rem;'
+                    f'padding-top:9px;line-height:1.45">{r["prediksi"]}</div>',
+                    unsafe_allow_html=True)
             with cpr:
-                st.markdown(f'<div style="{s}font-family:\'DM Mono\',monospace;'
-                            f'color:#eef0f8;font-size:.82rem;line-height:46px;text-align:center">'
-                            f'{r["prob"]}</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div style="{s}font-family:\'DM Mono\',monospace;'
+                    f'color:#eef0f8;font-size:.82rem;line-height:46px;text-align:center">'
+                    f'{r["prob"]}</div>',
+                    unsafe_allow_html=True)
             with cst:
-                vv = r.get("variant", "safe")
-                st.markdown(f'<div style="{s}padding-top:10px;text-align:center">'
-                            f'<span class="badge {vv}">{r["status"]}</span></div>',
-                            unsafe_allow_html=True)
+                v = r.get("variant", "safe")
+                st.markdown(
+                    f'<div style="{s}padding-top:10px;text-align:center">'
+                    f'<span class="badge {v}">{r["status"]}</span></div>',
+                    unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
         ca, cb, _ = st.columns([1, 1, 2])
@@ -773,37 +951,41 @@ elif current_page == NAV_PAGES[1]:
             if st.button("Deteksi Baru", type="primary", use_container_width=True, key="baru"):
                 st.session_state.hasil   = None
                 st.session_state.img_pil = None
-                st.session_state.page    = NAV_PAGES[0]
+                st.session_state.page    = "Deteksi Lesi Kulit"
                 st.rerun()
 
 # ═════════════════════════════════════════════════════════════
 # ── HALAMAN 3: TENTANG SISTEM ─────────────────────────────────
 # ═════════════════════════════════════════════════════════════
-elif current_page == NAV_PAGES[2]:
+elif st.session_state.page == "Tentang Sistem":
 
+    render_mobile_nav()
     st.markdown('<h1 class="page-heading">Tentang Sistem</h1>', unsafe_allow_html=True)
     st.markdown(
         '<p class="page-sub">Informasi teknis, arsitektur model, dan kelas lesi kulit yang didukung.</p>',
-        unsafe_allow_html=True)
+        unsafe_allow_html=True,
+    )
 
     col_info, col_kelas = st.columns([1, 1.1], gap="large")
 
     with col_info:
         st.markdown('<p class="slabel">Informasi Teknis</p>', unsafe_allow_html=True)
-        for label, val in [
-            ("Nama Sistem",      "SPK Deteksi Dini Kanker Kulit"),
-            ("Arsitektur Model", "MobileNetV2 + Transfer Learning"),
-            ("Dataset",          "HAM10000 — 10.015 citra"),
-            ("Jumlah Kelas",     "7 kelas lesi kulit"),
-            ("Framework",        "TensorFlow + Streamlit"),
-            ("Input Citra",      "224 × 224 piksel (RGB)"),
-            ("Platform",         "Streamlit Community Cloud"),
-        ]:
+        specs = [
+            ("Nama Sistem",        "SPK Deteksi Dini Kanker Kulit"),
+            ("Arsitektur Model",   "MobileNetV2 + Transfer Learning"),
+            ("Dataset",            "HAM10000 — 10.015 citra"),
+            ("Jumlah Kelas",       "7 kelas lesi kulit"),
+            ("Framework",          "TensorFlow + Streamlit"),
+            ("Input Citra",        "224 × 224 piksel (RGB)"),
+            ("Platform Deploy",    "Streamlit Community Cloud"),
+        ]
+        for label, val in specs:
             st.markdown(f"""
             <div class="info-card">
               <div class="info-card-label">{label}</div>
               <div class="info-card-value">{val}</div>
-            </div>""", unsafe_allow_html=True)
+            </div>
+            """, unsafe_allow_html=True)
 
     with col_kelas:
         st.markdown('<p class="slabel">7 Kelas Lesi Kulit</p>', unsafe_allow_html=True)
@@ -816,17 +998,19 @@ elif current_page == NAV_PAGES[2]:
                 <span class="kelas-code">({code})</span>
               </div>
               <span class="badge {v}">{info['kategori']}</span>
-            </div>""", unsafe_allow_html=True)
+            </div>
+            """, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown('<p class="slabel">Cara Penggunaan</p>', unsafe_allow_html=True)
-        for i, s in enumerate([
+        steps = [
             "Buka halaman Deteksi Lesi Kulit",
             "Unggah citra dermoskopi (JPG/PNG, maks. 5 MB)",
             "Klik tombol Analisis Sekarang",
             "Baca hasil prediksi dan distribusi probabilitas",
             "Konsultasikan hasil ke dokter spesialis kulit",
-        ], 1):
+        ]
+        for i, s in enumerate(steps, 1):
             st.markdown(f"""
             <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">
               <div style="flex-shrink:0;width:22px;height:22px;border-radius:50%;
@@ -834,4 +1018,5 @@ elif current_page == NAV_PAGES[2]:
                           font-size:.72rem;font-weight:700;color:#a8c0ff;
                           display:flex;align-items:center;justify-content:center">{i}</div>
               <p style="font-size:.83rem;color:var(--t2);margin:2px 0 0;line-height:1.5">{s}</p>
-            </div>""", unsafe_allow_html=True)
+            </div>
+            """, unsafe_allow_html=True)
