@@ -550,7 +550,7 @@ if _qp in _NAV_PARAM_MAP:
 # ═════════════════════════════════════════════════════════════
 # MODEL LOAD
 # ═════════════════════════════════════════════════════════════
-@st.cache_resource(show_spinner=False)
+@st.cache_resource(show_spinner="Memuat model MobileNetV2…")
 def load_assets():
     m = tf.keras.models.load_model("model_final.h5")
     with open("label_map.json") as f:
@@ -561,13 +561,6 @@ def preprocess(img: Image.Image) -> np.ndarray:
     img = img.convert("RGB").resize((224, 224))
     arr = np.array(img, dtype=np.float32) / 255.0
     return np.expand_dims(arr, axis=0)
-
-def img_to_b64(img: Image.Image, size=(56, 56)) -> str:
-    t = img.copy().convert("RGB")
-    t.thumbnail(size)
-    buf = io.BytesIO()
-    t.save(buf, format="JPEG", quality=75)
-    return base64.b64decode(base64.b64encode(buf.getvalue())).decode()
 
 def img_b64_str(img: Image.Image, size=(56, 56)) -> str:
     t = img.copy().convert("RGB")
@@ -824,10 +817,9 @@ if st.session_state.page == "Deteksi Lesi Kulit":
 
             # ── Probability bars ──
             st.markdown('<p class="slabel" style="margin-top:.5rem">Distribusi Probabilitas</p>', unsafe_allow_html=True)
-            max_p = h["probs"][0]["prob"] if h["probs"] else 1
             bars_html = ""
             for item in h["probs"]:
-                width = (item["prob"] / max_p * 100) if max_p > 0 else 0
+                width = item["prob"] * 100
                 bars_html += f"""
                 <div class="pbar-row">
                   <div class="pbar-name">{item['name']} <span style="color:var(--t3);font-size:.7rem">({item['label']})</span></div>
