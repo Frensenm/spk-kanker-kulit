@@ -182,6 +182,10 @@ div[data-testid="stFileUploader"]:hover {
   border-color: var(--accent) !important;
 }
 div[data-testid="stFileUploader"] label { display: none !important; }
+div[data-testid="stFileUploader"] [data-testid="stFileUploaderDropzoneInstructions"] div:has(small),
+div[data-testid="stFileUploader"] [data-testid="stFileUploaderDropzoneInstructions"] small {
+  display: none !important;
+}
 
 .upload-hint {
   text-align: center;
@@ -319,18 +323,46 @@ div[data-testid="stFileUploader"] label { display: none !important; }
 hr { border-color: var(--border) !important; margin: 1.5rem 0 !important; }
 
 /* ── Riwayat table ────────────────────────────────── */
-.rtable-head {
-  display: grid;
-  grid-template-columns: 36px 130px 52px 1fr 100px 90px;
-  gap: 0;
-  background: var(--bg3);
+.rtable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
   border: 1px solid var(--border);
-  border-radius: var(--radius) var(--radius) 0 0;
-  padding: 10px 14px;
+  border-radius: var(--radius);
+  overflow: hidden;
 }
-.rtable-hcell {
+.rtable thead th {
+  background: var(--bg3);
   font-size: 0.65rem; font-weight: 700;
-  letter-spacing: 0.1em; text-transform: uppercase; color: var(--t3);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--t3);
+  padding: 11px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.rtable thead th:last-child { text-align: center; }
+.rtable tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+  font-size: 0.82rem;
+  color: var(--t1);
+}
+.rtable tbody tr:last-child td { border-bottom: none; }
+.rtable tbody tr:nth-child(even) td { background: #0f1220; }
+.rtable tbody tr:nth-child(odd) td { background: var(--bg2); }
+.rtable .td-no   { color: var(--t3); width: 36px; text-align: center; }
+.rtable .td-waktu { color: var(--t2); font-size: 0.78rem; white-space: nowrap; }
+.rtable .td-citra { width: 52px; text-align: center; }
+.rtable .td-citra img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border2); }
+.rtable .td-prob  { font-family: 'DM Mono', monospace; text-align: center; white-space: nowrap; }
+.rtable .td-status { text-align: center; }
+@media (max-width: 768px) {
+  .rtable thead th, .rtable tbody td { padding: 8px 10px; font-size: 0.75rem; }
+  .rtable .td-no { display: none; }
+  .rtable thead th:first-child { display: none; }
+  .rtable .td-citra img { width: 34px; height: 34px; }
 }
 
 /* ── Tentang cards ────────────────────────────────── */
@@ -872,66 +904,31 @@ elif st.session_state.page == "Riwayat Prediksi":
         )
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # ── Header ──
-        st.markdown("""
-        <div class="rtable-head">
-          <span class="rtable-hcell">No</span>
-          <span class="rtable-hcell">Waktu</span>
-          <span class="rtable-hcell">Citra</span>
-          <span class="rtable-hcell">Prediksi</span>
-          <span class="rtable-hcell">Prob.</span>
-          <span class="rtable-hcell">Status</span>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # ── Rows — native Streamlit columns ──
+        # ── Table ──
         rev = list(reversed(st.session_state.riwayat))
+        rows_html = ""
         for i, r in enumerate(rev, 1):
-            is_last = i == len(rev)
-            br = f"0 0 {12}px {12}px" if is_last else "0"
-            bg = "#111420" if i % 2 == 0 else "#0f1220"
-            s = (f"background:{bg};border-left:1px solid #252a40;"
-                 f"border-right:1px solid #252a40;border-bottom:1px solid #252a40;"
-                 f"border-radius:{br};padding:9px 5px;")
-
-            cno, cwk, cim, cpd, cpr, cst = st.columns([0.36, 1.3, 0.52, 2.0, 0.95, 0.9])
-
-            with cno:
-                st.markdown(
-                    f'<div style="{s}padding-left:14px;color:#4a5270;'
-                    f'font-size:.82rem;line-height:46px">{i}</div>',
-                    unsafe_allow_html=True)
-            with cwk:
-                st.markdown(
-                    f'<div style="{s}color:#8892b0;font-size:.78rem;'
-                    f'padding-top:9px;line-height:1.45">{r["waktu"]}</div>',
-                    unsafe_allow_html=True)
-            with cim:
-                st.markdown(f'<div style="{s}">', unsafe_allow_html=True)
-                try:
-                    img_bytes = base64.b64decode(r["img_b64"])
-                    thumb = Image.open(io.BytesIO(img_bytes))
-                    st.image(thumb, width=44)
-                except Exception:
-                    st.markdown("—")
-                st.markdown("</div>", unsafe_allow_html=True)
-            with cpd:
-                st.markdown(
-                    f'<div style="{s}color:#eef0f8;font-size:.82rem;'
-                    f'padding-top:9px;line-height:1.45">{r["prediksi"]}</div>',
-                    unsafe_allow_html=True)
-            with cpr:
-                st.markdown(
-                    f'<div style="{s}font-family:\'DM Mono\',monospace;'
-                    f'color:#eef0f8;font-size:.82rem;line-height:46px;text-align:center">'
-                    f'{r["prob"]}</div>',
-                    unsafe_allow_html=True)
-            with cst:
-                v = r.get("variant", "safe")
-                st.markdown(
-                    f'<div style="{s}padding-top:10px;text-align:center">'
-                    f'<span class="badge {v}">{r["status"]}</span></div>',
-                    unsafe_allow_html=True)
+            v = r.get("variant", "safe")
+            rows_html += (
+                f'<tr>'
+                f'<td class="td-no">{i}</td>'
+                f'<td class="td-waktu">{r["waktu"]}</td>'
+                f'<td class="td-citra"><img src="data:image/jpeg;base64,{r["img_b64"]}" alt="citra"></td>'
+                f'<td>{r["prediksi"]}</td>'
+                f'<td class="td-prob">{r["prob"]}</td>'
+                f'<td class="td-status"><span class="badge {v}">{r["status"]}</span></td>'
+                f'</tr>'
+            )
+        st.markdown(
+            f'<table class="rtable">'
+            f'<thead><tr>'
+            f'<th>No</th><th>Waktu</th><th>Citra</th>'
+            f'<th>Prediksi</th><th>Prob.</th><th>Status</th>'
+            f'</tr></thead>'
+            f'<tbody>{rows_html}</tbody>'
+            f'</table>',
+            unsafe_allow_html=True,
+        )
 
         st.markdown("<br>", unsafe_allow_html=True)
         ca, cb, _ = st.columns([1, 1, 2])
